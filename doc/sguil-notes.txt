@@ -1,0 +1,17 @@
+Filenames are like this: stats.interface.unixtimestamp:
+/nsm_data/hostname/sancp/stats.peth0.1244209823
+
+Each file contains 1 or more lines like this:
+----8<----
+5343839945096828433|2009-06-05 13:48:14|2009-06-05 13:48:14|0|17|1361045767|56694|1361043554|53|1|48|1|96|0|0
+5343839945096976838|2009-06-05 13:48:14|2009-06-05 13:48:14|0|17|1361045767|60603|1361043554|53|1|45|1|166|0|0
+5343839945097042436|2009-06-05 13:48:14|2009-06-05 13:48:14|0|17|1361045767|40189|1361043554|53|1|45|1|166|0|0
+5343839945097049070|2009-06-05 13:48:14|2009-06-05 13:48:35|21|6|1361045767|49528|3252367494|80|4|0|0|0|2|0
+----8<----
+The fields mean:
+sancp-connection-ID| ISO START TIME | ISO END TIME |duration time|protocol|src_ip|src_port|src_ip|src_port|src_packets|src_bytes|dst_packets|dst_bytes|src_flags|dst_flags
+
+
+# Conforms with out sguil sancp table schema
+format stats sancp_id,start_time_gmt,stop_time_gmt,duration,ip_proto,src_ip_decimal,src_port,dst_ip_decimal,dst_port,src_pkts,src_bytes,dst_pkts,dst_bytes,sflags,dflags
+
