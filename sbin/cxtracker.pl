@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Data::Dumper;
+use DateTime;
 use Net::Pcap;
 use FindBin;
 use Getopt::Long qw/:config auto_version auto_help/;
@@ -54,6 +54,7 @@ cxtracker.pl - inspired by Huginn
  OPTIONS:
 
  --dev|-d       : network device (default: eth0)
+ --sguil        : enables sguil output and sets output dir
  --debug        : enable debug messages (default: 0 (disabled))
  --help         : this help message
  --version      : show cxtracker.pl version
@@ -63,13 +64,15 @@ cxtracker.pl - inspired by Huginn
 our $VERSION       = 0.1;
 our $DEBUG         = 0;
 our $TIMEOUT       = 5;
+my $cxtrackerid    = 100000000;
 my $DEVICE         = q(wlan0);
 my $session        = {};
-#$LOGFILE           = $conf->{log_file}              || $LOGFILE;
-#$PIDFILE           = $conf->{pid_file}              || $PIDFILE;
 my $DAEMON         = 0;
 my $LOGFILE        = q(/var/log/cxtracker.log);
 my $PIDFILE        = q(/var/run/cxtracker.pid);
+my $SGUIL          = q();
+my $LOG            = 1;
+my $LOG_OUTPUT     = q();
 my %ERROR          = (
     lookup_net     => q(Unable to look up device information for %s - %s),
     create_object  => q(Unable to create packet capture on device %s - %s),
@@ -79,7 +82,8 @@ my %ERROR          = (
 
 GetOptions(
     'dev|d=s'       => \$DEVICE,
-    'debug=s'         => \$DEBUG,
+    'debug=s'       => \$DEBUG,
+    'sguil=s'       => \$SGUIL,
 );
 
 # Signal handlers
@@ -106,8 +110,6 @@ my %stats = ();
 Net::Pcap::stats ($PCAP, \%stats);
 $stats{timestamp} = time;
 $stats{tot_sessions} = $stats{tcp_sessions} = $stats{udp_sessions} = $stats{icmp_sessions} = $stats{other_sessions} = 0;
-
-print "src_ip, src_port, dst_ip, dst_port, ip_type, src_byte, src_packets, dst_byte, dst_packets, src_flags, dst_flags, start_timestamp, last_timestamp, tot_time\n" if $DEBUG >0;
 
 # Prepare to meet the Daemon
 if ( $DAEMON ) {
@@ -207,28 +209,33 @@ sub packet {
 
 sub session_tracking {
     my ($src_ip, $src_port, $dst_ip, $dst_port, $type, $length, $tcpflags, $tstamp) = @_;
+    my $s_key = "$type:$src_ip:$src_port:$dst_ip:$dst_port";
+    my $d_key = "$type:$dst_ip:$dst_port:$src_ip:$src_port";
 
     # Update initial src
-    if ($session->{"$type:$src_ip:$src_port:$dst_ip:$dst_port"}) {
-        $session->{"$type:$src_ip:$src_port:$dst_ip:$dst_port"}{src_flags}      |= $tcpflags;
-        $session->{"$type:$src_ip:$src_port:$dst_ip:$dst_port"}{src_byte}        = +$length;
-        $session->{"$type:$src_ip:$src_port:$dst_ip:$dst_port"}{src_packets}    += 1;
-        $session->{"$type:$src_ip:$src_port:$dst_ip:$dst_port"}{last_timestamp}  = $tstamp;
-        print "Updateing: $type:$src_ip:$src_port:$dst_ip:$dst_port\n" if $DEBUG > 2;
+    if ($session->{"$s_key"}) {
+        $session->{"$s_key"}{src_flags}      |= $tcpflags;
+        $session->{"$s_key"}{src_byte}        = +$length;
+        $session->{"$s_key"}{src_packets}    += 1;
+        $session->{"$s_key"}{last_timestamp}  = $tstamp;
+        print "Updateing: $s_key\n" if $DEBUG > 2;
     }
     # Update inital dst
-    elsif ($session->{"$type:$dst_ip:$dst_port:$src_ip:$src_port"}) {
-        $session->{"$type:$dst_ip:$dst_port:$src_ip:$src_port"}{dst_flags}      |= $tcpflags;
-        $session->{"$type:$dst_ip:$dst_port:$src_ip:$src_port"}{dst_byte}        = +$length;
-        $session->{"$type:$dst_ip:$dst_port:$src_ip:$src_port"}{dst_packets}    += 1;
-        $session->{"$type:$dst_ip:$dst_port:$src_ip:$src_port"}{last_timestamp}  = $tstamp;
-        print "Updateing: $type:$dst_ip:$dst_port:$src_ip:$src_port\n" if $DEBUG > 2;
+    elsif ($session->{"$d_key"}) {
+        $session->{"$d_key"}{dst_flags}      |= $tcpflags;
+        $session->{"$d_key"}{dst_byte}        = +$length;
+        $session->{"$d_key"}{dst_packets}    += 1;
+        $session->{"$d_key"}{last_timestamp}  = $tstamp;
+        print "Updateing: $d_key\n" if $DEBUG > 2;
     }
     # Then this has to be a new connection...
     else {
-        print "New      : $type:$src_ip:$src_port:$dst_ip:$dst_port\n" if $DEBUG>0;
+        print "New      : $s_key\n" if $DEBUG>0;
         add_session_stat($type);
-        $session->{"$type:$src_ip:$src_port:$dst_ip:$dst_port"} = {
+        $cxtrackerid += 1;
+        my $cxid = "$tstamp$cxtrackerid";
+        $session->{"$s_key"} = {
+                     cx_id           => $cxid,
                      ip_type         => $type,
                      src_ip          => $src_ip,
                      src_port        => $src_port,
@@ -269,6 +276,7 @@ sub session_tracking {
 
 sub end_sessions {
     my $now = time;
+    $LOG_OUTPUT = q();
     while ( my ($key, $values) = each(%$session) ) {
     print "Checking : $key\n" if $DEBUG > 1;
         # TCP
@@ -289,7 +297,6 @@ sub end_sessions {
            elsif ($session->{"$key"}{src_flags} & SYNACK && $session->{"$key"}{dst_flags} & SYNACK ) {
                export_session($key,1) if ($now - $session->{"$key"}{last_timestamp}) > 120 ;
            }
-           return;
         }
         # UDP
         elsif ($session->{"$key"}{ip_type} == 17 ) {
@@ -298,7 +305,6 @@ sub end_sessions {
             }else{
                 export_session($key,1) if ($now - $session->{"$key"}{last_timestamp}) > 60 ;
             }
-            return;
         }
         # ICMP
         elsif ($session->{"$key"}{ip_type} == 1 ) {
@@ -307,7 +313,6 @@ sub end_sessions {
             }else{
                 export_session($key,1) if ($now - $session->{"$key"}{last_timestamp}) > 60 ;
             }
-            return;
         }
         # ALL OTHER IP->{TYPE}
         else { 
@@ -316,10 +321,11 @@ sub end_sessions {
             }else{
                 export_session($key,1) if ($now - $session->{"$key"}{last_timestamp}) > 600 ;
             }
-            return;
         }
-        return;
     }
+    # Output plugins batch output
+    sguil_file() if $SGUIL;
+    return;
 }
 
 =head2 export_session
@@ -333,30 +339,71 @@ sub end_sessions {
 
 sub export_session {
     my ($key, $delete) = @_;
+    print "Ending   : " if ($DEBUG > 1 && $delete == 1);
+    print "Status   : " if ($DEBUG > 1 && $delete == 0);
+    # Add output modules here:
+    cxtracker_default_output($key) if $LOG;
+    sguil_output_plugin($key) if $SGUIL;
+    delete $session->{$key} if $delete;
+}
+
+=head2 sguil_output_plugin
+
+ Output plugin for sguil. Outputs in sancp format.
+ Takes $key as input.
+
+=cut
+
+sub sguil_output_plugin {
+    my $key = shift;
     my $tot_time = $session->{$key}{last_timestamp} - $session->{$key}{start_timestamp};
-    # Put session to log/db
+    my $dt_s = DateTime->from_epoch( epoch => $session->{$key}{start_timestamp});
+    my $dt_e = DateTime->from_epoch( epoch => $session->{$key}{last_timestamp});
+    my $s_t = $dt_s->ymd . " " . $dt_s->hms;
+    my $e_t = $dt_e->ymd . " " . $dt_e->hms;
+    my $src_dip = ip2dec($session->{$key}{src_ip});
+    my $dst_dip = ip2dec($session->{$key}{dst_ip});
+ 
     # For now - print STDOUT. And later make it all in one print statement!
     # * To have it work with sguil - the file name should be stats.$DEVICE.time; Output format in file should be:
     #   CNX-ID| ISO START TIME | ISO END TIME |tot_time|ip_type|src_ip|src_port|dst_ip|dst_port|src_packets|src_byte|dst_packets|dst_byte|src_flags|dst_flags 
     # Format:
     # src_ip,src_port,dst_ip,dst_port,ip_type,src_byte,src_packets,dst_byte,dst_packets,src_flags,dst_flags,start_timestamp,last_timestamp,tot_time
-    print "Ending   : " if ($DEBUG > 1 && $delete == 1);
-    print "Status   : " if ($DEBUG > 1 && $delete == 0);
-    print "$session->{$key}{src_ip}, ";
-    print "$session->{$key}{src_port}, ";
-    print "$session->{$key}{dst_ip}, ";
-    print "$session->{$key}{dst_port}, ";
-    print "$session->{$key}{ip_type}, ";
-    print "$session->{$key}{src_byte}, ";
-    print "$session->{$key}{src_packets}, ";
-    print "$session->{$key}{dst_byte}, ";
-    print "$session->{$key}{dst_packets}, ";
-    print "$session->{$key}{src_flags}, ";
-    print "$session->{$key}{dst_flags}, ";
-    print "$session->{$key}{start_timestamp}, ";
-    print "$session->{$key}{last_timestamp}, ";
+    my $sguil_output = "$session->{$key}{cx_id}|$s_t|$e_t|$tot_time|$session->{$key}{ip_type}|$src_dip|$session->{$key}{src_port}|$dst_dip|$session->{$key}{dst_port}|$session->{$key}{src_packets}|$session->{$key}{src_byte}|$session->{$key}{dst_packets}|$session->{$key}{dst_byte}|$session->{$key}{src_flags}|$session->{$key}{dst_flags}\n";
+    $LOG_OUTPUT = $LOG_OUTPUT . $sguil_output;
+    return;
+}
+
+=head2 sguil_file
+ Prints $LOG_OUTPUT to sguil/sancp file
+=cut
+
+sub sguil_file {
+    # /sguil_data/hostname/sancp/stats.eth1.1244209823
+    return if !$LOG_OUTPUT;
+    my $tstamp = time;
+    my $file = "/$SGUIL/stats.$DEVICE.$tstamp";
+    open FILE, ">>$file" or die "unable to open $file $!";
+    print FILE $LOG_OUTPUT;
+    close FILE;
+}
+
+=head2 cxtracker_default_output
+
+ Default output to STDOUT
+
+=cut
+
+sub cxtracker_default_output {
+    my $key = shift;
+    my $tot_time = $session->{$key}{last_timestamp} - $session->{$key}{start_timestamp};
+    # Format:
+    # cx_id,src_ip,src_port,dst_ip,dst_port,ip_type,src_byte,src_packets,dst_byte,dst_packets,src_flags,dst_flags,start_timestamp,last_timestamp,tot_time
+    print "$session->{$key}{cx_id},$session->{$key}{src_ip},$session->{$key}{src_port},$session->{$key}{dst_ip},";
+    print "$session->{$key}{dst_port},$session->{$key}{ip_type},$session->{$key}{src_byte},";
+    print "$session->{$key}{src_packets},$session->{$key}{dst_byte},$session->{$key}{dst_packets},$session->{$key}{src_flags},";
+    print "$session->{$key}{dst_flags},$session->{$key}{start_timestamp},$session->{$key}{last_timestamp},";
     print "$tot_time\n";
-    delete $session->{$key} if $delete;
     return;
 }
 
@@ -473,6 +520,26 @@ sub add_session_stat {
     else{
         $stats{"other_sessions"} += 1;
     }
+}
+
+=head2 ip2dec
+
+ Convert IP to decimal
+
+=cut
+
+sub ip2dec ($) {
+    return unpack N => pack CCCC => split /\./ => shift;
+}
+
+=head2 dec2ip
+
+ Convert decimal to IP
+
+=cut
+
+sub dec2ip ($) {
+    return join '.' => map { ($_[0] >> 8*(3-$_)) % 256 } 0 .. 3;
 }
 
 =head2 game_over
