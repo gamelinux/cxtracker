@@ -67,7 +67,7 @@ our $VERSION       = 0.1;
 our $DEBUG         = 0;
 our $TIMEOUT       = 5;
 my $cxtrackerid    = 100000000;
-my $DEVICE         = q(wlan0);
+my $DEVICE         = q(eth0);
 my $session        = {};
 my $DAEMON         = 0;
 my $LOGFILE        = q(/var/log/cxtracker.log);
@@ -86,7 +86,7 @@ GetOptions(
     'dev|d=s'       => \$DEVICE,
     'debug=s'       => \$DEBUG,
     'sguil=s'       => \$SGUIL,
-    'daemon'      => \$DAEMON,
+    'daemon'        => \$DAEMON,
 );
 
 # Signal handlers
@@ -97,10 +97,9 @@ $SIG{"TERM"}  = sub { game_over() };
 $SIG{"QUIT"}  = sub { game_over() };
 $SIG{"KILL"}  = sub { game_over() };
 $SIG{"ALRM"}  = sub { end_sessions(); alarm $TIMEOUT; };
-alarm $TIMEOUT;
 
 warn "Starting cxtracker.pl...\n";
-
+warn "Using $DEVICE\n";
 warn "Creating object\n" if $DEBUG;
 my $PCAP = create_object($DEVICE);
 
@@ -119,7 +118,7 @@ if ( $DAEMON ) {
         print "Daemonizing...\n";
         chdir ("/") or die "chdir /: $!\n";
         open (STDIN, "/dev/null") or die "open /dev/null: $!\n";
-        open (STDOUT, "> $LOGFILE") or die "open > /dev/null: $!\n";
+        open (STDOUT, "> $LOGFILE") or die "open > $LOGFILE: $!\n";
         defined (my $dpid = fork) or die "fork: $!\n";
         if ($dpid) {
                 # Write PID file
@@ -131,6 +130,8 @@ if ( $DAEMON ) {
         setsid ();
         open (STDERR, ">&STDOUT");
 }
+
+alarm $TIMEOUT;
 
 warn "Looping over object\n" if $DEBUG;
 Net::Pcap::loop($PCAP, -1, \&packet, '') or die $ERROR{'loop'};
@@ -388,7 +389,7 @@ sub sguil_file {
     my $file = "/$SGUIL/stats.$DEVICE.$tstamp";
     open FILE, ">>$file" or die "unable to open $file $!";
     print FILE $LOG_OUTPUT;
-    close FILE;
+    close (FILE);
 }
 
 =head2 cxtracker_default_output
@@ -556,6 +557,7 @@ sub game_over {
     dump_stats();
     warn " Closing device: $DEVICE\n";
     Net::Pcap::close($PCAP);
+    unlink ($PIDFILE);
     exit 0;
 }
 
