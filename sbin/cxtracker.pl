@@ -2,6 +2,7 @@
 
 use strict;
 use warnings;
+use POSIX qw(setsid);
 use DateTime;
 use Net::Pcap;
 use FindBin;
@@ -55,6 +56,7 @@ cxtracker.pl - inspired by Huginn
 
  --dev|-d       : network device (default: eth0)
  --sguil        : enables sguil output and sets output dir
+ --daemon       : enables daemon mode
  --debug        : enable debug messages (default: 0 (disabled))
  --help         : this help message
  --version      : show cxtracker.pl version
@@ -84,6 +86,7 @@ GetOptions(
     'dev|d=s'       => \$DEVICE,
     'debug=s'       => \$DEBUG,
     'sguil=s'       => \$SGUIL,
+    'daemon'      => \$DAEMON,
 );
 
 # Signal handlers
