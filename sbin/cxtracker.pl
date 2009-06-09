@@ -170,7 +170,6 @@ sub packet {
     # Check if IP ( also ETH_TYPE_IPv6 ?)
     if ( $eth->{type} == ETH_TYPE_IP){
         # We should now have us an IP packet... good!
-        my $ethernet = NetPacket::Ethernet::strip($packet);
         my $ip       = NetPacket::IP->decode($eth->{data});
         my $src_ip   = $ip->{'src_ip'};
         my $dst_ip   = $ip->{'dest_ip'};
