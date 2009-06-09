@@ -8,6 +8,8 @@ use Net::Pcap;
 use FindBin;
 use Getopt::Long qw/:config auto_version auto_help/;
 use constant ETH_TYPE_IP        => 0x0800;
+use constant ETH_TYPE_802Q1T    => 0x8100;
+use constant ETH_TYPE_802Q1MT   => 0x9100;
 use constant SYNACK             => 0x12;
 
 BEGIN {
@@ -66,6 +68,7 @@ cxtracker.pl - inspired by Huginn
 our $VERSION       = 0.1;
 our $DEBUG         = 0;
 our $TIMEOUT       = 5;
+our $VLAN          = 1;
 my $cxtrackerid    = 100000000;
 my $DEVICE         = q(eth0);
 my $session        = {};
@@ -156,11 +159,24 @@ sub packet {
     my $tstamp   = time;
     my $eth      = NetPacket::Ethernet->decode($packet); 
 
+    # if VLAN - strip vlan tag(s)
+    if ( $VLAN ) {
+        if ( $eth->{type} == ETH_TYPE_802Q1MT ){
+            (my $mvlan, my $vlan, $eth->{data}) = unpack('nna*' , $eth->{data});
+            $eth->{type} = ETH_TYPE_IP;
+        }
+        if ( $eth->{type} == ETH_TYPE_802Q1T  ){
+            (my $vlan, $eth->{data}) = unpack('na*' , $eth->{data});
+            $eth->{type} = ETH_TYPE_IP;
+        }
+    }
+
     # Check if IP ( also ETH_TYPE_IPv6 ?)
     if ( $eth->{type} == ETH_TYPE_IP){
         # We should now have us an IP packet... good!
         my $ethernet = NetPacket::Ethernet::strip($packet);
-        my $ip       = NetPacket::IP->decode($ethernet);
+        my $ip       = NetPacket::IP->decode($eth->{data});
+        #my $ip       = NetPacket::IP->decode($ethernet);
         my $src_ip   = $ip->{'src_ip'};
         my $dst_ip   = $ip->{'dest_ip'};
         my $length   = $ip->{'len'} - $ip->{'hlen'};
@@ -491,7 +507,7 @@ sub filter_object {
     my $object = shift;
     my $netmask = q(0);
     my $filter;
-    my $BPF = q(ip);
+    my $BPF = q();
 
     Net::Pcap::compile(
         $object, \$filter, $BPF, 0, $netmask
