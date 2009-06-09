@@ -208,9 +208,12 @@ sub packet {
         elsif($ip->{proto} == 1) {
             # NetPacket::ICMP is missing id and sequence field. Extract id to use as port
             my $icmp       = NetPacket::ICMP->decode($ip->{'data'});
-            my ($id, $data) = unpack("na*", $icmp->{'data'});
-            my $src_port  = $id;
-            my $dst_port  = $id;
+            my $src_port  = 0;
+            my $dst_port  = 0;
+            if ( $icmp->{'data'} ) {
+                my ($id, $data) = unpack("na*", $icmp->{'data'});
+                $src_port  = $dst_port = $id;
+            }
             session_tracking($src_ip, $src_port, $dst_ip, $dst_port, $ip->{proto}, $length, $tcpflags, $tstamp);
         }else{
             my $src_port  = my $dst_port = $ip->{proto};
