@@ -159,24 +159,19 @@ sub packet {
     my $tstamp   = time;
     my $eth      = NetPacket::Ethernet->decode($packet); 
 
-#    # if VLAN - strip vlan tag(s)
-#    if ( $VLAN ) {
-#        if ( $eth->{type} == ETH_TYPE_802Q1MT ){
-#            (my $mvlan, my $vlan, $eth->{data}) = unpack('nna*' , $eth->{data});
-#            $eth->{type} = ETH_TYPE_IP;
-#        }
-#        if ( $eth->{type} == ETH_TYPE_802Q1T  ){
-#            (my $vlan, $eth->{data}) = unpack('na*' , $eth->{data});
-#            $eth->{type} = ETH_TYPE_IP;
-#        }
-#    }
+    # if VLAN - strip vlan tag(s)
+    if ( $eth->{type} == ETH_TYPE_802Q1T  ){
+        (my $vid, $eth->{type}, $eth->{data}) = unpack('nna*' , $eth->{data});
+    }
+    elsif ( $eth->{type} == ETH_TYPE_802Q1MT ){
+        (my $mvid, my $tpid, my $vid, $eth->{type}, $eth->{data}) = unpack('nnna*' , $eth->{data});
+    }
 
     # Check if IP ( also ETH_TYPE_IPv6 ?)
     if ( $eth->{type} == ETH_TYPE_IP){
         # We should now have us an IP packet... good!
         my $ethernet = NetPacket::Ethernet::strip($packet);
         my $ip       = NetPacket::IP->decode($eth->{data});
-        #my $ip       = NetPacket::IP->decode($ethernet);
         my $src_ip   = $ip->{'src_ip'};
         my $dst_ip   = $ip->{'dest_ip'};
         my $length   = $ip->{'len'} - $ip->{'hlen'};
