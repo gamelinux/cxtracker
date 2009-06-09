@@ -159,17 +159,17 @@ sub packet {
     my $tstamp   = time;
     my $eth      = NetPacket::Ethernet->decode($packet); 
 
-    # if VLAN - strip vlan tag(s)
-    if ( $VLAN ) {
-        if ( $eth->{type} == ETH_TYPE_802Q1MT ){
-            (my $mvlan, my $vlan, $eth->{data}) = unpack('nna*' , $eth->{data});
-            $eth->{type} = ETH_TYPE_IP;
-        }
-        if ( $eth->{type} == ETH_TYPE_802Q1T  ){
-            (my $vlan, $eth->{data}) = unpack('na*' , $eth->{data});
-            $eth->{type} = ETH_TYPE_IP;
-        }
-    }
+#    # if VLAN - strip vlan tag(s)
+#    if ( $VLAN ) {
+#        if ( $eth->{type} == ETH_TYPE_802Q1MT ){
+#            (my $mvlan, my $vlan, $eth->{data}) = unpack('nna*' , $eth->{data});
+#            $eth->{type} = ETH_TYPE_IP;
+#        }
+#        if ( $eth->{type} == ETH_TYPE_802Q1T  ){
+#            (my $vlan, $eth->{data}) = unpack('na*' , $eth->{data});
+#            $eth->{type} = ETH_TYPE_IP;
+#        }
+#    }
 
     # Check if IP ( also ETH_TYPE_IPv6 ?)
     if ( $eth->{type} == ETH_TYPE_IP){
