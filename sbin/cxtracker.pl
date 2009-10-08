@@ -156,6 +156,7 @@ exit;
 
 sub packet {
     my ($user_data, $header, $packet) = @_;
+
     my $tstamp   = time;
     my $eth      = NetPacket::Ethernet->decode($packet); 
 
@@ -217,7 +218,7 @@ sub packet {
     }
 }
 
-=head2
+=head2 session_tracking
 
  This modules takes the relevant info from an IP(TCP,UDP or ICMP) packet
  and tries to track it on packets, bytes, tcpflags and time.
@@ -488,7 +489,7 @@ sub create_object {
     my($err, $object);
     my $promisc = 1;    
 
-    $object = Net::Pcap::open_live($dev, 1500, $promisc, 0, \$err)
+    $object = Net::Pcap::open_live($dev, 65535, $promisc, 500, \$err)
               or die sprintf $ERROR{'create_object'}, $dev, $err;
     warn "create_object : $dev\n" if($DEBUG);
     return $object;
