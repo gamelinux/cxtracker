@@ -79,7 +79,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
    }
 
    else if ( eth_type == ETHERNET_TYPE_IPV6) {
-      printf("[*] Got IPv6 Packet...\n");
+      /* printf("[*] Got IPv6 Packet...\n"); */
       ip6_header *ip6;
       ip6 = (ip6_header *) (packet + eth_header_len);
       if ( ip6->next == IP_PROTO_TCP ) {
@@ -100,7 +100,8 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          icmp6_header *icmph;
          icmph = (icmp6_header *) (packet + eth_header_len + ip6->len);
          /* printf("[*] IPv6 PROTOCOL TYPE ICMP\n"); */
-         cx_track6(ip6->ip_src, icmph->icmp6_id, ip6->ip_dst, icmph->icmp6_id, ip6->next, ip6->len, 0, tstamp, AF_INET6);
+         /*cx_track6(ip6->ip_src, icmph->icmp6_id, ip6->ip_dst, icmph->icmp6_id, ip6->next, ip6->len, 0, tstamp, AF_INET6);*/
+         cx_track6(ip6->ip_src, ip6->hop_lmt, ip6->ip_dst, ip6->hop_lmt, ip6->next, ip6->len, 0, tstamp, AF_INET6);
          return;
       }
       else {
@@ -456,7 +457,7 @@ int main(int argc, char *argv[]) {
    bpf_u_int32 net_mask;
    bpf_u_int32 net_ip;
    pcap_t *handle;
-   dev = "wlan0";
+   dev = "eth0";
    bpff = "";
    cxtrackerid   = 999999999;
    timecnt = time(NULL);

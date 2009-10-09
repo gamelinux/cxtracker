@@ -3,7 +3,16 @@
 # TODO : apt-get install cxtracker
 
 # On a Ubuntu system:
-$ sudo aptitude install libnet-pcap-perl libgetopt-long-descriptive-perl git-core libdatetime-perl
+$ sudo aptitude install libnet-pcap-perl libgetopt-long-descriptive-perl git-core libdatetime-perl libpcap0.8
 $ git clone git://github.com/gamelinux/cxtracker.git
+
+# PERL
 $ sudo perl cxtracker/sbin/cxtracker.pl --help
+
+# C
+$ cd cxtracker/src/
+$ make
+$ sudo cxtracker.pl -h
+
+
 
