@@ -15,12 +15,23 @@
 
 u_int64_t   cxtrackerid;
 time_t      timecnt;
+time_t      tstamp;
+char        *dev,*dpath;
+int         verbose;
+int         inpacket, gameover;
+pcap_t      *handle;
 connection  *bucket[BUCKET_SIZE];
+connection  *cxtbuffer = NULL;
 static char src_s[INET6_ADDRSTRLEN];
 static char dst_s[INET6_ADDRSTRLEN];
 
+/* internal prototypes */
+void move_connection (connection*, connection**);
+
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet) {
-   time_t tstamp = time(NULL);
+   if ( gameover == 1 ) { game_over(); }
+   inpacket = 1;
+   tstamp = time(NULL);
    u_short p_bytes;
 
    /* printf("[*] Got network packet...\n"); */
@@ -54,6 +65,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          tcph = (tcp_header *) (packet + eth_header_len + (IP_HL(ip4)*4));
          /* printf("[*] IPv4 PROTOCOL TYPE TCP:\n"); */
          cx_track4(ip4->ip_src, tcph->src_port, ip4->ip_dst, tcph->dst_port, ip4->ip_p, p_bytes, tcph->t_flags, tstamp, AF_INET);
+         inpacket = 0;
          return;
       }
       else if (ip4->ip_p == IP_PROTO_UDP) {
@@ -61,6 +73,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          udph = (udp_header *) (packet + eth_header_len + (IP_HL(ip4)*4));
          /* printf("[*] IPv4 PROTOCOL TYPE UDP:\n"); */
          cx_track4(ip4->ip_src, udph->src_port, ip4->ip_dst, udph->dst_port, ip4->ip_p, p_bytes, 0, tstamp, AF_INET);
+         inpacket = 0;
          return;
       }
       else if (ip4->ip_p == IP_PROTO_ICMP) {
@@ -68,14 +81,15 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          icmph = (icmp_header *) (packet + eth_header_len + (IP_HL(ip4)*4));
          /* printf("[*] IP PROTOCOL TYPE ICMP\n"); */
          cx_track4(ip4->ip_src, icmph->s_icmp_id, ip4->ip_dst, icmph->s_icmp_id, ip4->ip_p, p_bytes, 0, tstamp, AF_INET);
+         inpacket = 0;
          return;
       }
       else {
          /* printf("[*] IPv4 PROTOCOL TYPE OTHER: %d\n",ip4->ip_p); */
          cx_track4(ip4->ip_src, ip4->ip_p, ip4->ip_dst, ip4->ip_p, ip4->ip_p, p_bytes, 0, tstamp, AF_INET);
+         inpacket = 0;
          return;
       }
-      return;
    }
 
    else if ( eth_type == ETHERNET_TYPE_IPV6) {
@@ -87,6 +101,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          tcph = (tcp_header *) (packet + eth_header_len + ip6->len);
          /* printf("[*] IPv6 PROTOCOL TYPE TCP:\n"); */
          cx_track6(ip6->ip_src, tcph->src_port, ip6->ip_dst, tcph->dst_port, ip6->next, ip6->len, tcph->t_flags, tstamp, AF_INET6);
+         inpacket = 0;
          return;
       }
       else if (ip6->next == IP_PROTO_UDP) {
@@ -94,32 +109,36 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          udph = (udp_header *) (packet + eth_header_len + ip6->len);
          /* printf("[*] IPv6 PROTOCOL TYPE UDP:\n"); */
          cx_track6(ip6->ip_src, udph->src_port, ip6->ip_dst, udph->dst_port, ip6->next, ip6->len, 0, tstamp, AF_INET6);
+         inpacket = 0;
          return;
       }
       else if (ip6->next == IP6_PROTO_ICMP) {
          icmp6_header *icmph;
          icmph = (icmp6_header *) (packet + eth_header_len + ip6->len);
          /* printf("[*] IPv6 PROTOCOL TYPE ICMP\n"); */
-         /*cx_track6(ip6->ip_src, icmph->icmp6_id, ip6->ip_dst, icmph->icmp6_id, ip6->next, ip6->len, 0, tstamp, AF_INET6);*/
          cx_track6(ip6->ip_src, ip6->hop_lmt, ip6->ip_dst, ip6->hop_lmt, ip6->next, ip6->len, 0, tstamp, AF_INET6);
+         inpacket = 0;
          return;
       }
       else {
          /* printf("[*] IPv6 PROTOCOL TYPE OTHER: %d\n",ip6->next); */
          cx_track6(ip6->ip_src, ip6->next, ip6->ip_dst, ip6->next, ip6->next, ip6->len, 0, tstamp, AF_INET6);
+         inpacket = 0;
          return;
       }
    }
+   inpacket = 0;
    return;
    /* else { */
       /* printf("[*] ETHERNET TYPE : %x\n", eth_hdr->eth_ip_type); */
    /*   return; */
    /* } */
 }
-
-void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_port,uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af) {
+void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_port,
+               uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af) {
 
    connection *s_cxt = NULL;
+   connection *prev = NULL;
    uint64_t s_hash;
 
    s_hash = (( ip_src + ip_dst ) + (src_port + dst_port )) % BUCKET_SIZE; 
@@ -143,14 +162,8 @@ void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_po
          bucket[s_hash] = s_cxt;
          return;
       }
-      if ( s_cxt->next != NULL ) {
-         s_cxt = s_cxt->next;
-      }
-      else {
-         /* Have hash, but not the connection. Must be a new one... */
-         s_cxt = s_cxt->next;
-         break;
-      }
+      prev = s_cxt;
+      s_cxt = s_cxt->next;
    }
 
    if ( s_cxt == NULL ) {
@@ -175,6 +188,7 @@ void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_po
       s_cxt->d_port         = dst_port;
       s_cxt->proto          = ip_proto;
       s_cxt->next           = NULL;
+      s_cxt->prev           = prev;
 
       bucket[s_hash] = s_cxt;
 
@@ -191,28 +205,32 @@ void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_po
    return;
 }
 
-void cx_track6(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,uint16_t dst_port,uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af) {
+void cx_track6(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,uint16_t dst_port,
+               uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af) {
 
    connection *s_cxt = NULL;
+   connection *prev = NULL;
    uint32_t s_hash;
 
-   /* Need to enhance this! */
-   s_hash = (( src_port + dst_port + ip_proto + af )) % BUCKET_SIZE;
+   /* Do we need all fields? */
+   s_hash = ((  ip_src.s6_addr32[0] + ip_src.s6_addr32[1] + ip_src.s6_addr32[2] + ip_src.s6_addr32[3]
+              + ip_dst.s6_addr32[0] + ip_dst.s6_addr32[1] + ip_dst.s6_addr32[2] + ip_dst.s6_addr32[3]
+              + src_port + dst_port )) % BUCKET_SIZE;
 
    s_cxt = bucket[s_hash];
 
    while ( s_cxt != NULL ) {
-/* if (s_cxt->s_ip6 == ip_src && s_cxt->d_ip6 == ip_dst && s_cxt->s_port == src_port && s_cxt->d_port == dst_port ) { */
-      if ( s_cxt->s_port == src_port && s_cxt->d_port == dst_port && s_cxt->proto == ip_proto ) {
+      if ( memcmp(&s_cxt->s_ip6,&ip_src,16) && memcmp(&s_cxt->d_ip6,&ip_dst,16) &&
+           s_cxt->s_port == src_port && s_cxt->d_port == dst_port ) {
          s_cxt->s_tcpFlags    |= tcpflags;
          s_cxt->s_total_bytes += p_bytes;
          s_cxt->s_total_pkts  += 1;
          s_cxt->last_pkt_time  = tstamp;
          bucket[s_hash] = s_cxt;
          return;
-      }
-/* else if(s_cxt->s_ip6 == ip_dst && s_cxt->d_ip6 == ip_src && s_cxt->d_port == src_port && s_cxt->d_port == src_port ) { */
-   else if ( s_cxt->d_port == src_port && s_cxt->d_port == src_port && s_cxt->proto == ip_proto ) {
+      }else 
+      if ( memcmp(&s_cxt->s_ip6,&ip_dst,16) && memcmp(&s_cxt->d_ip6,&ip_src,16) &&
+           s_cxt->d_port == src_port && s_cxt->d_port == src_port ) {
          s_cxt->d_tcpFlags    |= tcpflags;
          s_cxt->d_total_bytes += p_bytes;
          s_cxt->d_total_pkts  += 1;
@@ -220,14 +238,8 @@ void cx_track6(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,u
          bucket[s_hash] = s_cxt;
          return;
       }
-      if ( s_cxt->next != NULL ) {
-         s_cxt = s_cxt->next;
-      }
-      else {
-         /* Have hash, but not the connection. Must be a new one... */
-         s_cxt = s_cxt->next;
-         break;
-      }
+      prev = s_cxt;
+      s_cxt = s_cxt->next;
    }
 
    if ( s_cxt == NULL ) {
@@ -252,6 +264,7 @@ void cx_track6(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,u
       s_cxt->d_port         = dst_port;
       s_cxt->proto          = ip_proto;
       s_cxt->next           = NULL;
+      s_cxt->prev           = prev;
 
       bucket[s_hash] = s_cxt;
       if ( ((tstamp - timecnt) > TIMEOUT) ) {
@@ -285,152 +298,177 @@ void cx_track6(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,u
 */
 
 void end_sessions() {
-   connection *cnx;
+
+   connection *cxt;
    time_t check_time;
    check_time = time(NULL);
    int cxkey, xpir;
    int expired = 0;
    
    for ( cxkey = 0; cxkey < BUCKET_SIZE; cxkey++ ) {
-      cnx = bucket[cxkey];
+      cxt = bucket[cxkey];
       xpir = 0;
-      while ( cnx != NULL ) {
+      while ( cxt != NULL ) {
          /* TCP */
-         if ( cnx->proto == IP_PROTO_TCP ) {
+         if ( cxt->proto == IP_PROTO_TCP ) {
            /* FIN from both sides */
-           if ( cnx->s_tcpFlags & TF_FIN && cnx->d_tcpFlags & TF_FIN && (check_time - cnx->last_pkt_time) > 5 ) {
+           if ( cxt->s_tcpFlags & TF_FIN && cxt->d_tcpFlags & TF_FIN && (check_time - cxt->last_pkt_time) > 5 ) {
               xpir = 1;
            }
            /* RST from eather side */
-           else if ( (cnx->s_tcpFlags & TF_RST || cnx->d_tcpFlags & TF_RST) && (check_time - cnx->last_pkt_time) > 5) {
+           else if ( (cxt->s_tcpFlags & TF_RST || cxt->d_tcpFlags & TF_RST) && (check_time - cxt->last_pkt_time) > 5) {
               xpir = 1;
            }
            /* if not a complete TCP 3-way handshake */
-           else if ( !cnx->s_tcpFlags&TF_SYNACK || !cnx->d_tcpFlags&TF_SYNACK && (check_time - cnx->last_pkt_time) > 10) {
+           else if ( !cxt->s_tcpFlags&TF_SYNACK || !cxt->d_tcpFlags&TF_SYNACK && (check_time - cxt->last_pkt_time) > 10) {
               xpir = 1;
            }
            /* Ongoing timout */
-           else if ( (cnx->s_tcpFlags&TF_SYNACK || cnx->d_tcpFlags&TF_SYNACK) && ((check_time - cnx->last_pkt_time) > 120)) {
+           else if ( (cxt->s_tcpFlags&TF_SYNACK || cxt->d_tcpFlags&TF_SYNACK) && ((check_time - cxt->last_pkt_time) > 120)) {
               xpir = 1;
            }
          }
-         else if ( cnx->proto == IP_PROTO_UDP ) {
-            if ( !cnx->d_total_pkts > 0 && (check_time - cnx->last_pkt_time) > 10) {
+         else if ( cxt->proto == IP_PROTO_UDP ) {
+            if ( !cxt->d_total_pkts > 0 && (check_time - cxt->last_pkt_time) > 10) {
                xpir = 1;
             }
-            else if ( (check_time - cnx->last_pkt_time) > 60 ) {
-               xpir = 1;
-            }
-         }
-         else if ( cnx->proto == IP_PROTO_ICMP || cnx->proto == IP6_PROTO_ICMP ) {
-            if ( !cnx->d_total_pkts > 0 && (check_time - cnx->last_pkt_time) > 10) {
-               xpir = 1;
-            }
-            /* > 10 should be > 60 (Keep for testing now) */
-            else if ( (check_time - cnx->last_pkt_time) > 60 ) {
+            else if ( (check_time - cxt->last_pkt_time) > 60 ) {
                xpir = 1;
             }
          }
-         else if ( cnx->d_total_pkts > 0 && (check_time - cnx->last_pkt_time) > 100 ) {
+         else if ( cxt->proto == IP_PROTO_ICMP || cxt->proto == IP6_PROTO_ICMP ) {
+            if ( !cxt->d_total_pkts > 0 && (check_time - cxt->last_pkt_time) > 10) {
+               xpir = 1;
+            }
+            else if ( (check_time - cxt->last_pkt_time) > 60 ) {
+               xpir = 1;
+            }
+         }
+         else if ( cxt->d_total_pkts > 0 && (check_time - cxt->last_pkt_time) > 100 ) {
             xpir = 1;
          }
-         else if ( (check_time - cnx->last_pkt_time) > 600 ) {
+         else if ( (check_time - cxt->last_pkt_time) > 600 ) {
             xpir = 1;
          }
 
          if ( xpir == 1 ) {
-
-            export_session (cnx);
             expired++;
             xpir = 0;
-
-            /* If there are no more elements in the list - NULL and free() */
-            if ( cnx->prev == NULL && cnx->next == NULL ) {
-               cnx = NULL;
-               bucket[cxkey] = NULL;
-               free (bucket[cxkey]);
-               break;
-            }
-
-            /* Update pointers */
-            if ( cnx->prev != NULL ) { 
-               cnx->prev->next = cnx->next;
-            }
-            if ( cnx->next != NULL ) {
-               cnx->next->prev = cnx->prev;
-            }
-
-            cnx = cnx->next;
-         }
-         else {
-            if ( cnx->next != NULL ) {
-               cnx = cnx->next;
-            }
-            else {
-               break;
-            }
+            connection *tmp = cxt;
+            cxt = cxt->next;
+            move_connection(tmp, &bucket[cxkey]);
+         }else{
+            cxt = cxt->next;
          }
       }
+   }
+   cxtbuffer_write(); 
+}
+
+void move_connection (connection* cxt, connection **bucket_ptr ){
+   /* remove cxt from bucket */
+   connection *prev = cxt->prev; /* OLDER connections */
+   connection *next = cxt->next; /* NEWER connections */
+   /* if next NULL, NEWEST. if PREV NULL, oldest. */
+   if(prev != NULL) prev->next = next;
+   if(next == NULL){
+      *bucket_ptr = prev;
+   }else{
+      next->prev = prev;
+   }
+   /* add cxt to expired list */
+   cxt->next = cxtbuffer;
+   cxtbuffer = cxt;
+   cxt->prev = NULL;
+}
+
+void cxtbuffer_write () {
+
+   if ( cxtbuffer == NULL ) { return; }
+   connection *next;
+   next = NULL;
+ 
+   FILE *cxtFile;
+   char *cxtfname;
+   cxtfname = "";
+   asprintf(&cxtfname, "%s/stats.%s.%ld", dpath, dev, tstamp);
+
+   cxtFile = fopen(cxtfname, "w");
+
+   if (cxtFile == NULL) {
+      printf("[*] ERROR: Cant open file %s\n",cxtfname);
+   }
+   else {
+      
+      while ( cxtbuffer != NULL ) {
+         char stime[80], ltime[80];
+         time_t tot_time;
+
+         static char src_s[INET6_ADDRSTRLEN];
+         static char dst_s[INET6_ADDRSTRLEN];
+
+         if (cxtbuffer->ipversion == AF_INET) {
+            if (!inet_ntop(AF_INET, &cxtbuffer->s_ip4, src_s, INET6_ADDRSTRLEN))
+               perror("Something died in inet_ntop");
+            if (!inet_ntop(AF_INET, &cxtbuffer->d_ip4, dst_s, INET6_ADDRSTRLEN))
+               perror("Something died in inet_ntop");
+         }
+         else if (cxtbuffer->ipversion == AF_INET6) {
+            if (!inet_ntop(AF_INET6, &cxtbuffer->s_ip6, src_s, INET6_ADDRSTRLEN))
+               perror("Something died in inet_ntop");
+            if (!inet_ntop(AF_INET6, &cxtbuffer->d_ip6, dst_s, INET6_ADDRSTRLEN))
+               perror("Something died in inet_ntop");
+         }
+
+         tot_time = cxtbuffer->last_pkt_time - cxtbuffer->start_time;
+         strftime(stime, 80, "%F %H:%M:%S", gmtime(&cxtbuffer->start_time));
+         strftime(ltime, 80, "%F %H:%M:%S", gmtime(&cxtbuffer->last_pkt_time));
+
+         if ( verbose == 1 ) {
+            printf("%ld%ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
+                                                cxtbuffer->proto,src_s,ntohs(cxtbuffer->s_port));
+            printf("%s|%u|%ju|%ju|",dst_s,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,cxtbuffer->s_total_bytes);
+            printf("%ju|%ju|%u|%u\n",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
+                                     cxtbuffer->d_tcpFlags);
+         }
+
+         fprintf(cxtFile,"%ld%ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
+                                                      cxtbuffer->proto,src_s,ntohs(cxtbuffer->s_port));
+         fprintf(cxtFile,"%s|%u|%ju|%ju|",dst_s,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,
+                                          cxtbuffer->s_total_bytes);
+         fprintf(cxtFile,"%ju|%ju|%u|%u\n",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
+                                           cxtbuffer->d_tcpFlags);
+
+         next = cxtbuffer->next;
+         free(cxtbuffer);
+         cxtbuffer = next;
+      }
+      fclose(cxtFile);
+      free(cxtfname);
    }
 }
 
 void end_all_sessions() {
-   connection *cnx;
+   connection *cxt;
    int cxkey;
-
    for ( cxkey = 0; cxkey < BUCKET_SIZE; cxkey++ ) {
-      cnx = bucket[cxkey];
-      while ( cnx != NULL ) {
-         export_session (cnx);
-         if ( cnx->next == NULL ) {
-            break;
-         }
-         cnx = cnx->next;
+      cxt = bucket[cxkey];
+      while ( cxt != NULL ) {
+         connection *tmp = cxt;
+         cxt = cxt->next;           
+         move_connection(tmp, &bucket[cxkey]);
       }
    }
 }
 
-/*
- Prints out the ended sessions or status of active sessions.
- Takes %$session of sessions as input along with $delete.
- If $delete is 1, the session gets removed from %$session.
- If $delete is 0, the session is not removed from %$session.
-*/
-
-void export_session(connection *cnx) {
-
-   char stime[80], ltime[80];
-   time_t tot_time;
-
-   static char src_s[INET6_ADDRSTRLEN];
-   static char dst_s[INET6_ADDRSTRLEN];
-
-   if (cnx->ipversion == AF_INET) {
-      if (!inet_ntop(AF_INET, &cnx->s_ip4, src_s, INET6_ADDRSTRLEN))
-         perror("Something died in inet_ntop");
-      if (!inet_ntop(AF_INET, &cnx->d_ip4, dst_s, INET6_ADDRSTRLEN))
-         perror("Something died in inet_ntop");
-   }
-   else if (cnx->ipversion == AF_INET6) {
-      if (!inet_ntop(AF_INET6, &cnx->s_ip6, src_s, INET6_ADDRSTRLEN))
-         perror("Something died in inet_ntop");
-      if (!inet_ntop(AF_INET6, &cnx->d_ip6, dst_s, INET6_ADDRSTRLEN))
-         perror("Something died in inet_ntop");
-   }
-
-   tot_time = cnx->last_pkt_time - cnx->start_time;
-   strftime(stime, 80, "%F %H:%M:%S", gmtime(&cnx->start_time));
-   strftime(ltime, 80, "%F %H:%M:%S", gmtime(&cnx->last_pkt_time));
-
-   printf("%ld%ju|%s|%s|%ld|%d|%s|%u|",cnx->start_time,cnx->cxid,stime,ltime,tot_time,cnx->proto,src_s,ntohs(cnx->s_port));
-   printf("%s|%u|%ju|%ju|",dst_s,ntohs(cnx->d_port),cnx->s_total_pkts,cnx->s_total_bytes);
-   printf("%ju|%ju|%d|%d\n",cnx->d_total_pkts,cnx->d_total_bytes,cnx->s_tcpFlags,cnx->d_tcpFlags);
-}
-
 void game_over() {
-   printf("\nDumping ongoing connection:\n");
-   end_all_sessions();
-   exit (0);
+   gameover = 1;
+   if (inpacket == 0) {
+      end_all_sessions();
+      cxtbuffer_write();
+      pcap_close(handle);
+      exit (0);
+   }
 }
 
 int main(int argc, char *argv[]) {
@@ -441,28 +479,29 @@ int main(int argc, char *argv[]) {
    }
    printf("[*] Running cxtracker...\n");
 
-   signal(SIGKILL, game_over);
    signal(SIGTERM, game_over);
    signal(SIGINT,  game_over);
    signal(SIGQUIT, game_over);
    signal(SIGALRM, end_sessions);
    /* alarm(TIMEOUT); */
 
-   int ch, fromfile, setfilter, verbose;
+   int ch, fromfile, setfilter, version;
    struct in_addr addr;
    struct bpf_program cfilter;
-   char *dev, *bpff, *filename, errbuf[PCAP_ERRBUF_SIZE], *user_filter;
-   char *net_ip_string;
+   char *bpff, errbuf[PCAP_ERRBUF_SIZE], *user_filter;
+   char *net_ip_string, *configfile;
    char *net_mask_string;
    bpf_u_int32 net_mask;
    bpf_u_int32 net_ip;
-   pcap_t *handle;
    dev = "eth0";
    bpff = "";
-   cxtrackerid   = 999999999;
+   dpath = "/tmp";
+   cxtbuffer = NULL;
+   cxtrackerid  = 999999999;
+   inpacket = gameover = 0;
    timecnt = time(NULL);
 
-   while ((ch = getopt(argc, argv, "v:i:b:")) != -1)
+   while ((ch = getopt(argc, argv, "i:b:V:v:d:c:")) != -1)
    switch (ch) {
       case 'i':
          dev = optarg;
@@ -470,8 +509,17 @@ int main(int argc, char *argv[]) {
       case 'b':
          bpff = optarg;
          break;
+      case 'V':
+         version = 1;
+         break;
       case 'v':
          verbose = 1;
+         break;
+      case 'd':
+         dpath = optarg;
+         break;
+      case 'c':
+         configfile = optarg;
          break;
       default:
          exit(1);

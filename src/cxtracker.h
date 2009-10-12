@@ -5,7 +5,6 @@
 
 /*  D E F I N E S  ************************************************************/
 #define TIMEOUT                       60
-#define PKTCNT                        20000
 #define BUCKET_SIZE                   11113
 
 #define ETHERNET_TYPE_IP              0x0800
@@ -321,6 +320,6 @@ typedef struct _connection {
 void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_port,uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af);
 void cx_track6(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,uint16_t dst_port,uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af);
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet);
-void export_session(connection *cnx);
 void end_sessions();
-
+void cxtbuffer_write();
+void game_over();
