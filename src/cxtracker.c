@@ -154,7 +154,7 @@ void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_po
          bucket[s_hash] = s_cxt;
          return;
       }
-      else if ( s_cxt->s_ip4 == ip_dst && s_cxt->d_ip4 == ip_src && s_cxt->d_port == src_port && s_cxt->d_port == src_port ) {
+      else if ( s_cxt->s_ip4 == ip_dst && s_cxt->d_ip4 == ip_src && s_cxt->d_port == src_port && s_cxt->s_port == dst_port ) {
          s_cxt->d_tcpFlags    |= tcpflags;
          s_cxt->d_total_bytes += p_bytes;
          s_cxt->d_total_pkts  += 1;
@@ -230,7 +230,7 @@ void cx_track6(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,u
          return;
       }else 
       if ( memcmp(&s_cxt->s_ip6,&ip_dst,16) && memcmp(&s_cxt->d_ip6,&ip_src,16) &&
-           s_cxt->d_port == src_port && s_cxt->d_port == src_port ) {
+           s_cxt->d_port == src_port && s_cxt->s_port == dst_port ) {
          s_cxt->d_tcpFlags    |= tcpflags;
          s_cxt->d_total_bytes += p_bytes;
          s_cxt->d_total_pkts  += 1;
