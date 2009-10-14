@@ -4,8 +4,15 @@
 /*  I N C L U D E S  **********************************************************/
 
 /*  D E F I N E S  ************************************************************/
-#define TIMEOUT                       60
-#define BUCKET_SIZE                   11113
+#define TIMEOUT                       20
+/* fir   5K connectinos -> bucket should be: [min   50 -> max  100]
+/* for  10K connections -> bucket should be: [min  100 -> max  200]
+/* for  20K connections -> bucket should be: [min  200 -> max  400]
+/* for  50K connections -> bucket should be: [min  500 -> max 1000]
+/* for 100K connections -> bucket should be: [min 1000 -> max 2000]
+/* #define BUCKET_SIZE                   1669 */
+#define BUCKET_SIZE                   101
+/* #define BUCKET_SIZE                   31321 */
 
 #define ETHERNET_TYPE_IP              0x0800
 #define ETHERNET_TYPE_ARP             0x0806
@@ -41,6 +48,10 @@
 #define TF_SYNACK                     0x12
 #define TF_NORESERVED (TF_FIN|TF_SYN|TF_RST|TF_PUSH|TF_ACK|TF_URG)
 #define TF_FLAGS      (TF_FIN|TF_SYN|TF_RST|TF_ACK|TF_URG|TF_ECE|TF_CWR)
+
+#define SUCCESS     0
+#define ERROR       1
+#define STDBUF      1024
 
 /*  D A T A  S T R U C T U R E S  *********************************************/
 
