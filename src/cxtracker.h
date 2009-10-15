@@ -1,6 +1,25 @@
 /*
- * cxtracker.h
- */
+** This file is a part of cxtracker.
+**
+** Copyright (C) 2009, Redpill Linpro
+** Copyright (C) 2009, Edward Fjellskål <edward.fjellskaal@redpill-linpro.com>
+**
+** This program is free software; you can redistribute it and/or modify
+** it under the terms of the GNU General Public License as published by
+** the Free Software Foundation; either version 2 of the License, or
+** (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software
+** Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+**
+*/
+
 /*  I N C L U D E S  **********************************************************/
 
 /*  D E F I N E S  ************************************************************/
@@ -319,7 +338,6 @@ typedef struct _connection {
         u_int8_t s_tcpFlags;               /* tcpflags sent by source */
         u_int8_t d_tcpFlags;               /* tcpflags sent by destination */
         time_t start_time;                 /* connection start time */
-        time_t output_session_id;          /* */
         time_t last_pkt_time;              /* last seen packet time */
         u_int64_t cxid;                    /* connection id */
         struct _connection *prev;
