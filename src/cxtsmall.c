@@ -296,7 +296,7 @@ int main(int argc, char *argv[]) {
    bpff = "";
    dpath = "/tmp";
    cxtbuffer = NULL;
-   cxtrackerid  = -1;
+   cxtrackerid  = 9999999999;
    inpacket = gameover = 0;
    timecnt = time(NULL);
 

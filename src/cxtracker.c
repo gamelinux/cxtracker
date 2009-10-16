@@ -399,7 +399,7 @@ void end_sessions() {
             xpir = 1;
          }
          */
-         else if ( (check_time - cxt->last_pkt_time) > 600 ) {
+         else if ( (check_time - cxt->last_pkt_time) > 300 ) {
             xpir = 1;
          }
 
@@ -492,14 +492,14 @@ void cxtbuffer_write () {
          strftime(ltime, 80, "%F %H:%M:%S", gmtime(&cxtbuffer->last_pkt_time));
 
          if ( verbose == 1 ) {
-            printf("%ld%ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
+            printf("%ld%09ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
                                                 cxtbuffer->proto,src_s,ntohs(cxtbuffer->s_port));
             printf("%s|%u|%ju|%ju|",dst_s,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,cxtbuffer->s_total_bytes);
             printf("%ju|%ju|%u|%u\n",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
                                      cxtbuffer->d_tcpFlags);
          }
 
-         fprintf(cxtFile,"%ld%ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
+         fprintf(cxtFile,"%ld%09ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
                                                       cxtbuffer->proto,src_s,ntohs(cxtbuffer->s_port));
          fprintf(cxtFile,"%s|%u|%ju|%ju|",dst_s,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,
                                           cxtbuffer->s_total_bytes);
@@ -733,18 +733,19 @@ static int go_daemon() {
 
 int main(int argc, char *argv[]) {
 
-   int ch, fromfile, setfilter, version, drop_privs_flag, daemon_flag = 0;
+   int ch, fromfile, setfilter, version, drop_privs_flag, daemon_flag;
    int use_syslog = 0;
    struct in_addr addr;
    struct bpf_program cfilter;
    char *bpff, errbuf[PCAP_ERRBUF_SIZE], *user_filter;
    char *net_ip_string;
    bpf_u_int32 net_mask;
+   ch = fromfile = setfilter = version = drop_privs_flag = daemon_flag = 0;
    dev = "eth0";
    bpff = "";
    dpath = "/tmp";
    cxtbuffer = NULL;
-   cxtrackerid  = -1;
+   cxtrackerid  = 0;
    inpacket = gameover = 0;
    timecnt = time(NULL);
 
