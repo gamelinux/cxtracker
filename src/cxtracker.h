@@ -24,13 +24,13 @@
 
 /*  D E F I N E S  ************************************************************/
 #define TIMEOUT                       20
-/* fir   5K connectinos -> bucket should be: [min   50 -> max  100]
-/* for  10K connections -> bucket should be: [min  100 -> max  200]
-/* for  20K connections -> bucket should be: [min  200 -> max  400]
-/* for  50K connections -> bucket should be: [min  500 -> max 1000]
-/* for 100K connections -> bucket should be: [min 1000 -> max 2000]
-/* #define BUCKET_SIZE                   1669 */
-#define BUCKET_SIZE                   101
+/* for   5K connectinos -> bucket should be: [min   50 -> max  100] */
+/* for  10K connections -> bucket should be: [min  100 -> max  200] */
+/* for  20K connections -> bucket should be: [min  200 -> max  400] */
+/* for  50K connections -> bucket should be: [min  500 -> max 1000] */
+/* for 100K connections -> bucket should be: [min 1000 -> max 2000] */
+#define BUCKET_SIZE                   1669 
+/* #define BUCKET_SIZE                   101   */
 /* #define BUCKET_SIZE                   31321 */
 
 #define ETHERNET_TYPE_IP              0x0800

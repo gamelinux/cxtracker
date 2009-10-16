@@ -29,6 +29,7 @@
 #include <getopt.h>
 #include <time.h>
 #include "cxtracker.h"
+#include <assert.h>
 
 /*  G L O B A L E S  **********************************************************/
 u_int64_t    cxtrackerid;
@@ -124,8 +125,7 @@ void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_po
 
    s_hash = (( ip_src + ip_dst )) % BUCKET_SIZE;
 
-   s_cxt = bucket[s_hash];
-   head = s_cxt;
+   head = s_cxt = bucket[s_hash];
 
    while ( s_cxt != NULL ) {
       if ( s_cxt->s_ip4 == ip_src && s_cxt->d_ip4 == ip_dst && s_cxt->s_port == src_port && s_cxt->d_port == dst_port ) {
@@ -142,18 +142,19 @@ void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_po
          s_cxt->last_pkt_time  = tstamp;
          return;
       }
-      if (s_cxt == s_cxt->next ) {
-         s_cxt->next = NULL;
-      }
+      assert(s_cxt != s_cxt->next );
       s_cxt = s_cxt->next;
    }
 
    if ( s_cxt == NULL ) {
       cxtrackerid += 1;
       s_cxt = (connection*) calloc(1, sizeof(connection));
-      if (head != NULL && s_cxt != head) {
+      if (head != NULL){
          head->prev = s_cxt;
       }
+      s_cxt->next           = head;
+      s_cxt->prev           = NULL;
+
       /* printf("[*] New connection...\n"); */
       s_cxt->cxid           = cxtrackerid;
       s_cxt->ipversion      = af;
@@ -172,8 +173,6 @@ void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_po
       /* s_cxt->d_ip6          = 0; */
       s_cxt->d_port         = dst_port;
       s_cxt->proto          = ip_proto;
-      s_cxt->next           = head;
-      s_cxt->prev           = NULL;
 
       /* New connections are pushed on to the head of bucket[s_hash] */
       bucket[s_hash] = s_cxt;
@@ -204,16 +203,14 @@ void end_sessions() {
       xpir = 0;
       while ( cxt != NULL ) {
          curcxt++;
-         if ( (check_time - cxt->last_pkt_time) > 30 ) {
+         if ( (check_time - cxt->last_pkt_time) > 5 ) {
             xpir = 1;
          }
          if ( xpir == 1 ) {
             expired++;
             xpir = 0;
             connection *tmp = cxt;
-            if (cxt == cxt->next) {
-               cxt->next == NULL;
-            }
+            assert(cxt != cxt->next);
             cxt = cxt->next;
             move_connection(tmp, &bucket[cxkey]);
          }else{
@@ -222,54 +219,68 @@ void end_sessions() {
       }
    }
    printf("Expired: %u of %u total connections:\n",expired,curcxt);
-   //cxtbuffer_write();
+   cxtbuffer_write();
    printf("End.\n");
 }
 
+/* move cxt from bucket to cxtbuffer
+ * there are three cases usually:
+ * either, we are in the middle of list. Update next and prev
+ * or, we are at end of list, next==NULL, update prev->next = NULL
+
+*/
 void move_connection (connection* cxt, connection **bucket_ptr ){
    /* remove cxt from bucket */
    connection *prev = cxt->prev; /* OLDER connections */
    connection *next = cxt->next; /* NEWER connections */
-
-   /* if next NULL, NEWEST. if PREV NULL, oldest. */
-   if(prev != NULL && next != *bucket_ptr) {
+   if(prev == NULL){
+      // beginning of list
+      *bucket_ptr = next;
+      // not only entry
+      if(next)
+         next->prev = NULL;
+   } else if(next == NULL){
+      // at end of list!
+      prev->next = NULL;
+   } else {
+      // a node.
       prev->next = next;
-   }
-   if(next != NULL && prev != *bucket_ptr){
       next->prev = prev;
    }
 
-   if(next == NULL && prev == NULL) {
-      /* bucket should now point to NULL */
-      *bucket_ptr = NULL;
-   }
-   /* add cxt to expired list cxtbuffer */
-   cxt->next = cxtbuffer;
+   /* add cxt to expired list cxtbuffer 
+    - if head is null -> head = cxt;
+    */
+   cxt->next = cxtbuffer; // next = head
    cxt->prev = NULL;
-   cxtbuffer = cxt;
+   cxtbuffer = cxt;       // head = cxt. result: newhead = cxt->oldhead->list...
 }
 
 void cxtbuffer_write () {
 
    if ( cxtbuffer == NULL ) { return; }
-   connection *next, *debug;
+   connection *next, *debug, *head;
    next = NULL;
    debug = NULL;
+   head = cxtbuffer;
 
    while ( cxtbuffer != NULL ) {
       next = NULL;
       debug = cxtbuffer;
-      if(cxtbuffer == cxtbuffer->next){
-         cxtbuffer->next = NULL;
-      }
+//      if(cxtbuffer == cxtbuffer->next){
+//         cxtbuffer->next = NULL;
+//      }
       next = cxtbuffer->next;
-      if (cxtbuffer != NULL) {
+//      if (cxtbuffer != NULL) {
          free(cxtbuffer);
-      }
+         debug = NULL;
+//      }
       cxtbuffer = next;
    }
-/* just write something*/
-printf("Done...\n");
+
+//   if (head != NULL ) { free(head); }
+   /* just write something*/
+   printf("Done...\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -285,7 +296,7 @@ int main(int argc, char *argv[]) {
    bpff = "";
    dpath = "/tmp";
    cxtbuffer = NULL;
-   cxtrackerid  = 999999999;
+   cxtrackerid  = -1;
    inpacket = gameover = 0;
    timecnt = time(NULL);
 

@@ -196,16 +196,13 @@ void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_po
          cxt->last_pkt_time  = tstamp;
          return;
       }
-      if ( cxt == cxt->next ) {
-        cxt->next = NULL;
-      }
       cxt = cxt->next;
    }
 
    if ( cxt == NULL ) {
       cxtrackerid += 1;
       cxt = (connection*) calloc(1, sizeof(connection));
-      if (head != NULL && cxt != head) { 
+      if (head != NULL ) { 
          head->prev = cxt;
       }
       /* printf("[*] New connection...\n"); */
@@ -220,10 +217,16 @@ void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_po
       cxt->start_time     = tstamp;
       cxt->last_pkt_time  = tstamp;
       cxt->s_ip4          = ip_src;
-      /* cxt->s_ip6          = 0; */
+      /* cxt->s_ip6.s6_addr32[0]          = 0; */
+      /* cxt->s_ip6.s6_addr32[1]          = 0; */
+      /* cxt->s_ip6.s6_addr32[2]          = 0; */
+      /* cxt->s_ip6.s6_addr32[3]          = 0; */
       cxt->s_port         = src_port;
       cxt->d_ip4          = ip_dst;
-      /* cxt->d_ip6          = 0; */
+      /* cxt->d_ip6.s6_addr32[0]          = 0; */
+      /* cxt->d_ip6.s6_addr32[1]          = 0; */
+      /* cxt->d_ip6.s6_addr32[2]          = 0; */
+      /* cxt->d_ip6.s6_addr32[3]          = 0; */
       cxt->d_port         = dst_port;
       cxt->proto          = ip_proto;
       cxt->next           = head;
@@ -423,34 +426,34 @@ void move_connection (connection* cxt, connection **bucket_ptr ){
    /* remove cxt from bucket */
    connection *prev = cxt->prev; /* OLDER connections */
    connection *next = cxt->next; /* NEWER connections */
-
-   /* if next NULL, NEWEST. if PREV NULL, oldest. */
-   if(prev != NULL && next != *bucket_ptr) {
+   if(prev == NULL){
+      // beginning of list
+      *bucket_ptr = next;
+      // not only entry
+      if(next)
+         next->prev = NULL;
+   } else if(next == NULL){
+      // at end of list!
+      prev->next = NULL;
+   } else {
+      // a node.
       prev->next = next;
-   }
-   if(next != NULL && prev != *bucket_ptr){
       next->prev = prev;
    }
-//   if(next == NULL){
-//      *bucket_ptr = prev;
-//   }else{
 
-   if(next == NULL && prev == NULL) {
-      /* bucket should now point to NULL */
-      *bucket_ptr = NULL;
-   }
-   /* add cxt to expired list cxtbuffer */
-   cxt->next = cxtbuffer;
+   /* add cxt to expired list cxtbuffer 
+    - if head is null -> head = cxt;
+    */
+   cxt->next = cxtbuffer; // next = head
    cxt->prev = NULL;
-   cxtbuffer = cxt;
+   cxtbuffer = cxt;       // head = cxt. result: newhead = cxt->oldhead->list...
 }
 
 void cxtbuffer_write () {
 
    if ( cxtbuffer == NULL ) { return; }
-   connection *next, *debug;
+   connection *next;
    next = NULL;
-   debug = NULL;
  
    FILE *cxtFile;
    char *cxtfname;
@@ -505,15 +508,10 @@ void cxtbuffer_write () {
 
          /* Enten kjører vi free to ganger på samme peker her... */
          /* Eller så kommer det en peker to ganger fra end_sessions */
-         next = NULL;
-         debug = cxtbuffer;
-         if(cxtbuffer == cxtbuffer->next){
-            cxtbuffer->next = NULL;
-         }
+         //next = NULL;
          next = cxtbuffer->next;
-         if (cxtbuffer != NULL) {
-            free(cxtbuffer);
-         }
+         free(cxtbuffer);
+         cxtbuffer=NULL;
          cxtbuffer = next;
       }
       fclose(cxtFile);
@@ -746,7 +744,7 @@ int main(int argc, char *argv[]) {
    bpff = "";
    dpath = "/tmp";
    cxtbuffer = NULL;
-   cxtrackerid  = 999999999;
+   cxtrackerid  = -1;
    inpacket = gameover = 0;
    timecnt = time(NULL);
 
