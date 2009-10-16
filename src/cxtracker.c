@@ -23,9 +23,8 @@
 /*  I N C L U D E S  **********************************************************/
 #include <stdio.h>
 #include <stdlib.h>
-#include <arpa/inet.h>
 #include <string.h>
-#include <netinet/in.h>
+#include <netinet/in.h> 
 #include <signal.h>
 #include <pcap.h>
 #include <getopt.h>

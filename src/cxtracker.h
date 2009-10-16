@@ -74,26 +74,7 @@
 
 /*  D A T A  S T R U C T U R E S  *********************************************/
 
-/* 
- * Structure for IPv6 addresses
- */
-
-typedef struct _in6_addr {
-    union
-      {
-        uint8_t __u6_addr8[16];
-#if defined __USE_MISC || defined __USE_GNU
-        uint16_t __u6_addr16[8];
-        uint32_t __u6_addr32[4];
-#endif
-      } __in6_u;
-#define s6_addr                 __in6_u.__u6_addr8
-#if defined __USE_MISC || defined __USE_GNU
-# define s6_addr16              __in6_u.__u6_addr16
-# define s6_addr32              __in6_u.__u6_addr32
-#endif
-} in6_addr;
-
+*/
 /* 
  * Ethernet header
  */
