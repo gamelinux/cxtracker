@@ -535,7 +535,7 @@ void end_all_sessions() {
          }
       }
    }
-   printf("Expired: %d.\n",expired);
+   /* printf("Expired: %d.\n",expired); */
 }
 
 void bucket_keys_NULL() {
@@ -729,6 +729,22 @@ static int go_daemon() {
     return daemonize(NULL);
 }
 
+static void usage() {
+    printf("USAGE:\n");
+    printf(" $ cxtracker [options]\n");
+    printf("\n");
+    printf(" OPTIONS:\n");
+    printf("\n");
+    printf(" -i             : network device (default: eth0)\n");
+    printf(" -b             : berkeley packet filter\n");
+    printf(" -d             : directory to dump sessions files in\n");
+    printf(" -u             : user\n");
+    printf(" -g             : group\n");
+    printf(" -D             : enables daemon mode\n");
+    printf(" -h             : this help message\n");
+    printf(" -v             : verbose\n\n");
+}
+
 int main(int argc, char *argv[]) {
 
    int ch, fromfile, setfilter, version, drop_privs_flag, daemon_flag;
@@ -747,19 +763,13 @@ int main(int argc, char *argv[]) {
    inpacket = gameover = 0;
    timecnt = time(NULL);
 
-   if (getuid()) {
-      printf("[*] You must be root..\n");
-      return (1);
-   }
-   printf("[*] Running cxtracker...\n");
-
    signal(SIGTERM, game_over);
    signal(SIGINT,  game_over);
    signal(SIGQUIT, game_over);
    signal(SIGALRM, end_sessions);
    /* alarm(TIMEOUT); */
 
-   while ((ch = getopt(argc, argv, "b:d:Dg:i:p:P:u:v")) != -1)
+   while ((ch = getopt(argc, argv, "b:d:Dg:hi:p:P:u:v")) != -1)
    switch (ch) {
       case 'i':
          dev = strdup(optarg);
@@ -772,6 +782,10 @@ int main(int argc, char *argv[]) {
          break;
       case 'd':
          dpath = strdup(optarg);
+         break;
+      case 'h':
+         usage();
+         exit(0);
          break;
       case 'D':
          daemon_flag = 1;
@@ -794,6 +808,13 @@ int main(int argc, char *argv[]) {
          exit(1);
          break;
    }
+
+   if (getuid()) {
+      printf("[*] You must be root..\n");
+      return (1);
+   }
+
+   printf("[*] Running cxtracker %s\n",VERSION);
 
    errbuf[0] = '\0';
    /* look up an availible device if non specified */

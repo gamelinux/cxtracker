@@ -23,6 +23,7 @@
 /*  I N C L U D E S  **********************************************************/
 
 /*  D E F I N E S  ************************************************************/
+#define VERSION                       "0.9.1"
 #define TIMEOUT                       60
 /* for   5K connectinos -> bucket should be: [min   50 -> max  100] */
 /* for  10K connections -> bucket should be: [min  100 -> max  200] */

@@ -6,7 +6,8 @@
 # Baut'
 CxTracker (Connection Tracker) is a passive network connection tracker 
 for profiling, history, auditing and network discovery. It can be used 
-as an replacement for sancp in the sguil setup.
+as an replacement for sancp in the sguil setup. It handles vlan (2 layers)
+and IPv6 out of the box.
 
 # As is!
 This program is served 'as is'. We take no responsabuility for anything :)
@@ -16,9 +17,42 @@ See INSTALL
 
 #### USE ###
 
-### cxtracker.pl (The perl version)
+### cxtracker (The C version)
+I use it now instead of sancp in my sguil setup.
+See '$ cxtracker --help' for updated info
+cxtracker --help
+Usage:
+     $ cxtracker [options]
+
+     OPTIONS:
+
+     -i             : network device (default: eth0)
+     -b             : berkeley packet filter
+     -d             : directory to dump sessions files in
+     -u             : user
+     -g             : group
+     -D             : enables daemon mode
+     -h             : this help message
+     -v             : verbose
+#     -V             : show cxtracker.pl version
+
+# Example
+Running cxtracker in forground:
+ Only IPv4 traffic:
+ ./cxtracker -d /nsm_data/sensor1/sancp -u nsm -g nsm -i eth1 -b 'ip'
+
+ Only VLAN and IPv4 traffic:
+ ./cxtracker -d /nsm_data/sensor1/sancp -u nsm -g nsm -i eth1 -b 'vlan and ip'
+
+ vlan and IPv4 and IPv6:
+ ./cxtracker -d /nsm_data/sensor1/sancp -u nsm -g nsm -i eth1
+
+
+
+### cxtracker.pl (The perl version) Just a proofe of concept..
+### Dont use in prod :)
 Currently you can use it just to see or record your connections on
-your network. I use it now instead of sancp in my sguil setup.
+your network.
 See '$ cxtracker.pl --help' for updated info
 cxtracker.pl --help
 Usage:
@@ -40,23 +74,5 @@ $ ./cxtracker.pl --dev wlan0
 To have it work with sguil, sending it to daemon world, using eth0:
 $ ./cxtracker.pl --dev eth0 --daemon --sguil /sguil_data/`hostname -s`/sancp/
 
-### cxtracker (The C version)
-Currently you can use it just to see or record your connections on
-your network. I use it now instead of sancp in my sguil setup.
-See '$ cxtracker --help' for updated info
-cxtracker --help
-Usage:
-     $ cxtracker [options]
-
-     OPTIONS:
-
-     -i             : network device (default: eth0)
-     -d             : directory to dump sessions files in
-     -c             : config file
-     -u             : user
-     -g             : group
-     -D             : enables daemon mode
-     -h             : this help message
-     -V             : show cxtracker.pl version
 
 
