@@ -417,9 +417,8 @@ void end_sessions() {
          }
       }
    }
-   printf("Expired: %u of %u total connections:\n",expired,curcxt);
+   /* printf("Expired: %u of %u total connections:\n",expired,curcxt); */
    cxtbuffer_write(); 
-   printf("End.\n");
 }
 
 void move_connection (connection* cxt, connection **bucket_ptr ){
