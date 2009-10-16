@@ -759,7 +759,7 @@ int main(int argc, char *argv[]) {
    signal(SIGALRM, end_sessions);
    /* alarm(TIMEOUT); */
 
-   while ((ch = getopt(argc, argv, "b:d:D:g:i:p:P:u:v")) != -1)
+   while ((ch = getopt(argc, argv, "b:d:Dg:i:p:P:u:v")) != -1)
    switch (ch) {
       case 'i':
          dev = strdup(optarg);
