@@ -12,7 +12,8 @@ $ sudo perl cxtracker/sbin/cxtracker.pl --help
 # C
 $ cd cxtracker/src/
 $ make
-$ sudo cxtracker.pl -h
-
+$ sudo cxtracker -h
+# You can copy cxtracker to /usr/local/sbin/
+$ cp cxtracker /usr/local/sbin/
 
 
