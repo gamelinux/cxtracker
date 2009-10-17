@@ -1,0 +1,12 @@
+## TODO
+
+Before version 1.0
+ * Config file and parsing
+ * #ifdef debug
+ * init script
+ * Optimize as much as possible
+ * debian package
+ * rpm for RHEL/CentOS 5.x
+
+ * Maybe pcap stats, like dropped packets?
+

@@ -175,7 +175,8 @@ void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_po
    connection *head = NULL;
    uint64_t hash;
 
-   hash = (( ip_src + ip_dst ) + (src_port + dst_port )) % BUCKET_SIZE; 
+   /* hash = (( ip_src + ip_dst ) + (src_port + dst_port )) % BUCKET_SIZE; */
+   hash = (( ip_src + ip_dst )) % BUCKET_SIZE;
 
    cxt = bucket[hash];
    head = cxt;
@@ -216,13 +217,13 @@ void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_po
       cxt->start_time     = tstamp;
       cxt->last_pkt_time  = tstamp;
       cxt->s_ip4          = ip_src;
-      /* cxt->s_ip6.s6_addr32[0]          = 0; */
+      cxt->s_ip6.s6_addr32[0]          = 0; 
       /* cxt->s_ip6.s6_addr32[1]          = 0; */
       /* cxt->s_ip6.s6_addr32[2]          = 0; */
       /* cxt->s_ip6.s6_addr32[3]          = 0; */
       cxt->s_port         = src_port;
       cxt->d_ip4          = ip_dst;
-      /* cxt->d_ip6.s6_addr32[0]          = 0; */
+      cxt->d_ip6.s6_addr32[0]          = 0; 
       /* cxt->d_ip6.s6_addr32[1]          = 0; */
       /* cxt->d_ip6.s6_addr32[2]          = 0; */
       /* cxt->d_ip6.s6_addr32[3]          = 0; */
@@ -452,12 +453,17 @@ void cxtbuffer_write () {
    if ( cxtbuffer == NULL ) { return; }
    connection *next;
    next = NULL;
- 
+   char stime[80], ltime[80];
+   time_t tot_time;
+   static char src_s[INET6_ADDRSTRLEN];
+   static char dst_s[INET6_ADDRSTRLEN];
+   uint32_t s_ip_t, d_ip_t;
+
    FILE *cxtFile;
    char *cxtfname;
    cxtfname = "";
-   asprintf(&cxtfname, "%s/stats.%s.%ld", dpath, dev, tstamp);
 
+   asprintf(&cxtfname, "%s/stats.%s.%ld", dpath, dev, tstamp);
    cxtFile = fopen(cxtfname, "w");
 
    if (cxtFile == NULL) {
@@ -466,30 +472,25 @@ void cxtbuffer_write () {
    else {
       
       while ( cxtbuffer != NULL ) {
-         char stime[80], ltime[80];
-         time_t tot_time;
-
-         static char src_s[INET6_ADDRSTRLEN];
-         static char dst_s[INET6_ADDRSTRLEN];
-
-         if (cxtbuffer->ipversion == AF_INET) {
-            if (!inet_ntop(AF_INET, &cxtbuffer->s_ip4, src_s, INET6_ADDRSTRLEN))
-               perror("Something died in inet_ntop");
-            if (!inet_ntop(AF_INET, &cxtbuffer->d_ip4, dst_s, INET6_ADDRSTRLEN))
-               perror("Something died in inet_ntop");
-         }
-         else if (cxtbuffer->ipversion == AF_INET6) {
-            if (!inet_ntop(AF_INET6, &cxtbuffer->s_ip6, src_s, INET6_ADDRSTRLEN))
-               perror("Something died in inet_ntop");
-            if (!inet_ntop(AF_INET6, &cxtbuffer->d_ip6, dst_s, INET6_ADDRSTRLEN))
-               perror("Something died in inet_ntop");
-         }
 
          tot_time = cxtbuffer->last_pkt_time - cxtbuffer->start_time;
          strftime(stime, 80, "%F %H:%M:%S", gmtime(&cxtbuffer->start_time));
          strftime(ltime, 80, "%F %H:%M:%S", gmtime(&cxtbuffer->last_pkt_time));
 
          if ( verbose == 1 ) {
+            if (cxtbuffer->ipversion == AF_INET) {
+               if (!inet_ntop(AF_INET, &cxtbuffer->s_ip4, src_s, INET6_ADDRSTRLEN))
+                  perror("Something died in inet_ntop");
+               if (!inet_ntop(AF_INET, &cxtbuffer->d_ip4, dst_s, INET6_ADDRSTRLEN))
+                  perror("Something died in inet_ntop");
+            }
+            else if (cxtbuffer->ipversion == AF_INET6) {
+               if (!inet_ntop(AF_INET6, &cxtbuffer->s_ip6, src_s, INET6_ADDRSTRLEN))
+                  perror("Something died in inet_ntop");
+               if (!inet_ntop(AF_INET6, &cxtbuffer->d_ip6, dst_s, INET6_ADDRSTRLEN))
+                  perror("Something died in inet_ntop");
+            }
+
             printf("%ld%09ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
                                                 cxtbuffer->proto,src_s,ntohs(cxtbuffer->s_port));
             printf("%s|%u|%ju|%ju|",dst_s,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,cxtbuffer->s_total_bytes);
@@ -497,16 +498,34 @@ void cxtbuffer_write () {
                                      cxtbuffer->d_tcpFlags);
          }
 
-         fprintf(cxtFile,"%ld%09ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
-                                                      cxtbuffer->proto,src_s,ntohs(cxtbuffer->s_port));
-         fprintf(cxtFile,"%s|%u|%ju|%ju|",dst_s,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,
-                                          cxtbuffer->s_total_bytes);
-         fprintf(cxtFile,"%ju|%ju|%u|%u\n",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
-                                           cxtbuffer->d_tcpFlags);
+         if ( cxtbuffer->ipversion == AF_INET ) {
+            s_ip_t = ntohl(cxtbuffer->s_ip4);
+            d_ip_t = ntohl(cxtbuffer->d_ip4);
 
-         /* Enten kjører vi free to ganger på samme peker her... */
-         /* Eller så kommer det en peker to ganger fra end_sessions */
-         //next = NULL;
+            fprintf(cxtFile,"%ld%09ju|%s|%s|%ld|%u|%u|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
+                                                         cxtbuffer->proto,s_ip_t,ntohs(cxtbuffer->s_port));
+            fprintf(cxtFile,"%u|%u|%ju|%ju|",d_ip_t,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,
+                                             cxtbuffer->s_total_bytes);
+            fprintf(cxtFile,"%ju|%ju|%u|%u\n",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
+                                              cxtbuffer->d_tcpFlags);
+         }
+
+         if ( cxtbuffer->ipversion == AF_INET6 ) {
+            /* Use string for now for IPv6. Most likly one should use unsigned for each fields in IPv6 */
+            if ( verbose != 1 ) {
+               if (!inet_ntop(AF_INET6, &cxtbuffer->s_ip6, src_s, INET6_ADDRSTRLEN))
+                  perror("Something died in inet_ntop");
+               if (!inet_ntop(AF_INET6, &cxtbuffer->d_ip6, dst_s, INET6_ADDRSTRLEN))
+                  perror("Something died in inet_ntop");
+            }
+            fprintf(cxtFile,"%ld%09ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
+                                                         cxtbuffer->proto,src_s,ntohs(cxtbuffer->s_port));
+            fprintf(cxtFile,"%s|%u|%ju|%ju|",dst_s,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,
+                                             cxtbuffer->s_total_bytes);
+            fprintf(cxtFile,"%ju|%ju|%u|%u\n",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
+                                              cxtbuffer->d_tcpFlags);
+         }
+
          next = cxtbuffer->next;
          free(cxtbuffer);
          cxtbuffer=NULL;
