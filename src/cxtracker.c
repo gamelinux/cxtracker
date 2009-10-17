@@ -181,14 +181,14 @@ void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_po
    head = cxt;
 
    while ( cxt != NULL ) {
-      if ( cxt->s_ip4 == ip_src && cxt->d_ip4 == ip_dst && cxt->s_port == src_port && cxt->d_port == dst_port ) {
+      if ( (cxt->s_ip4 == ip_src && cxt->d_ip4 == ip_dst) && (cxt->s_port == src_port && cxt->d_port == dst_port) ) {
          cxt->s_tcpFlags    |= tcpflags;
          cxt->s_total_bytes += p_bytes;
          cxt->s_total_pkts  += 1;
          cxt->last_pkt_time  = tstamp;
          return;
       }
-      else if ( cxt->s_ip4 == ip_dst && cxt->d_ip4 == ip_src && cxt->d_port == src_port && cxt->s_port == dst_port ) {
+      else if ( (cxt->s_ip4 == ip_dst && cxt->d_ip4 == ip_src) && (cxt->d_port == src_port && cxt->s_port == dst_port) ) {
          cxt->d_tcpFlags    |= tcpflags;
          cxt->d_total_bytes += p_bytes;
          cxt->d_total_pkts  += 1;
