@@ -175,7 +175,6 @@ void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_po
    connection *head = NULL;
    uint64_t hash;
 
-   /* hash = (( ip_src + ip_dst ) + (src_port + dst_port )) % BUCKET_SIZE; */
    hash = (( ip_src + ip_dst )) % BUCKET_SIZE;
 
    cxt = bucket[hash];
@@ -283,9 +282,9 @@ void cx_track6(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,u
    if ( cxt == NULL ) {
       cxtrackerid += 1;
       cxt = (connection*) calloc(1, sizeof(connection));
-      //if (head) {
-      //   head->prev = cxt;
-      //}
+      if (head != NULL ) {
+         head->prev = cxt;
+      }
       /* printf("[*] New connection...\n"); */
       cxt->cxid           = cxtrackerid;
       cxt->ipversion      = af;
@@ -321,20 +320,6 @@ void cx_track6(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,u
 
 /*
  This sub marks sessions as ENDED on different criterias:
-
- Default TCP initial timeout                   10 seconds
- Default TCP ongoing timeout                    2 hours
- TCP timeout after RST received either way      5 seconds
- TCP timeout after ACK after FIN each way       5 seconds
- TCP timeout after ICMP error                   5 seconds
- Default UDP initial timeout                   60 seconds
- Default UDP ongoing timeout                   10 seconds
- UDP timeout after ICMP error                  10 seconds
- Default ICMP initial timeout                  10 seconds
- Default ICMP ongoing timeout                  60 seconds
- ICMP timeout after ICMP error                 10 seconds
- Default other initial timeout                100 seconds
- Default other ongoing timeout                100 minutes
 */
 
 void end_sessions() {
@@ -374,31 +359,14 @@ void end_sessions() {
               xpir = 1;
            }
          }
-         else if ( cxt->proto == IP_PROTO_UDP ) {
-            /*
-            if ( !cxt->d_total_pkts > 0 && (check_time - cxt->last_pkt_time) > 10) {
+         else if ( cxt->proto == IP_PROTO_UDP && (check_time - cxt->last_pkt_time) > 60 ) {
                xpir = 1;
-            }else
-            */
-            if ( (check_time - cxt->last_pkt_time) > 60 ) {
-               xpir = 1;
-            }
          }
          else if ( cxt->proto == IP_PROTO_ICMP || cxt->proto == IP6_PROTO_ICMP ) {
-            /*
-            if ( !cxt->d_total_pkts > 0 && (check_time - cxt->last_pkt_time) > 10) {
-               xpir = 1;
-            } else
-            */
             if ( (check_time - cxt->last_pkt_time) > 60 ) {
                xpir = 1;
             }
          }
-         /* 
-         else if ( cxt->d_total_pkts > 0 && (check_time - cxt->last_pkt_time) > 100 ) {
-            xpir = 1;
-         }
-         */
          else if ( (check_time - cxt->last_pkt_time) > 300 ) {
             xpir = 1;
          }
