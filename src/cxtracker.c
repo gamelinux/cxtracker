@@ -448,15 +448,15 @@ void cxtbuffer_write () {
 
          if ( verbose == 1 ) {
             if (cxtbuffer->ipversion == AF_INET) {
-               if (!inet_ntop(AF_INET, &cxtbuffer->s_ip4, src_s, INET6_ADDRSTRLEN))
+               if (!inet_ntop(AF_INET, &cxtbuffer->s_ip4, src_s, INET_ADDRSTRLEN + 1 ))
                   perror("Something died in inet_ntop");
-               if (!inet_ntop(AF_INET, &cxtbuffer->d_ip4, dst_s, INET6_ADDRSTRLEN))
+               if (!inet_ntop(AF_INET, &cxtbuffer->d_ip4, dst_s, INET_ADDRSTRLEN + 1 ))
                   perror("Something died in inet_ntop");
             }
             else if (cxtbuffer->ipversion == AF_INET6) {
-               if (!inet_ntop(AF_INET6, &cxtbuffer->s_ip6, src_s, INET6_ADDRSTRLEN))
+               if (!inet_ntop(AF_INET6, &cxtbuffer->s_ip6, src_s, INET6_ADDRSTRLEN + 1 ))
                   perror("Something died in inet_ntop");
-               if (!inet_ntop(AF_INET6, &cxtbuffer->d_ip6, dst_s, INET6_ADDRSTRLEN))
+               if (!inet_ntop(AF_INET6, &cxtbuffer->d_ip6, dst_s, INET6_ADDRSTRLEN + 1 ))
                   perror("Something died in inet_ntop");
             }
 
@@ -482,9 +482,9 @@ void cxtbuffer_write () {
          if ( cxtbuffer->ipversion == AF_INET6 ) {
             /* Use string for now for IPv6. Most likly one should use unsigned for each fields in IPv6 */
             if ( verbose != 1 ) {
-               if (!inet_ntop(AF_INET6, &cxtbuffer->s_ip6, src_s, INET6_ADDRSTRLEN))
+               if (!inet_ntop(AF_INET6, &cxtbuffer->s_ip6, src_s, INET6_ADDRSTRLEN + 1 ))
                   perror("Something died in inet_ntop");
-               if (!inet_ntop(AF_INET6, &cxtbuffer->d_ip6, dst_s, INET6_ADDRSTRLEN))
+               if (!inet_ntop(AF_INET6, &cxtbuffer->d_ip6, dst_s, INET6_ADDRSTRLEN + 1 ))
                   perror("Something died in inet_ntop");
             }
             fprintf(cxtFile,"%ld%09ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
