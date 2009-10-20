@@ -46,12 +46,11 @@ time_t       timecnt,tstamp;
 pcap_t       *handle;
 connection   *bucket[BUCKET_SIZE];
 connection   *cxtbuffer = NULL;
-static char  src_s[INET6_ADDRSTRLEN], dst_s[INET6_ADDRSTRLEN];
 static char  *dev,*dpath;
 static char  *group_name, *user_name, *true_pid_name;
 static char  *pidfile = "cxtracker.pid";
 static char  *pidpath = "/var/run";
-static int   verbose, inpacket, gameover, use_syslog;
+static int   verbose, inpacket, intr_flag, use_syslog;
 
 /*  I N T E R N A L   P R O T O T Y P E S  ************************************/
 void move_connection (connection*, connection**);
@@ -61,9 +60,11 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
 void end_sessions();
 void cxtbuffer_write();
 void game_over();
+void check_interupt();
+void dump_active();
 
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet) {
-   if ( gameover == 1 ) { game_over(); }
+   if ( intr_flag != 0 ) { check_interupt(); }
    inpacket = 1;
    tstamp = time(NULL);
    u_short p_bytes;
@@ -533,13 +534,35 @@ void bucket_keys_NULL() {
    }
 }
 
+void check_interupt() {
+   if ( intr_flag == 1 ) {
+      game_over();
+   }
+   else if ( intr_flag == 2 ) {
+      dump_active();
+   }
+   else {
+      intr_flag = 0;
+   }
+}
+
 void game_over() {
-   gameover = 1;
-   if (inpacket == 0) {
+   if ( inpacket == 0 ) {
       end_all_sessions();
       cxtbuffer_write();
       pcap_close(handle);
       exit (0);
+   }
+   intr_flag = 1;
+}
+
+void dump_active() {
+   if ( inpacket == 0 && intr_flag == 2 ) {
+      end_all_sessions();
+      cxtbuffer_write();
+      intr_flag = 0;
+   } else {
+      intr_flag = 2;
    }
 }
 
@@ -747,13 +770,14 @@ int main(int argc, char *argv[]) {
    dpath = "/tmp";
    cxtbuffer = NULL;
    cxtrackerid  = 0;
-   inpacket = gameover = 0;
+   inpacket = intr_flag = 0;
    timecnt = time(NULL);
 
    signal(SIGTERM, game_over);
    signal(SIGINT,  game_over);
    signal(SIGQUIT, game_over);
-   signal(SIGALRM, end_sessions);
+   signal(SIGHUP,  dump_active);
+   /* signal(SIGALRM, end_sessions); */
    /* alarm(TIMEOUT); */
 
    while ((ch = getopt(argc, argv, "b:d:Dg:hi:p:P:u:v")) != -1)
