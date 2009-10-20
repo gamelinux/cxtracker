@@ -46,7 +46,7 @@ time_t       timecnt,tstamp;
 pcap_t       *handle;
 connection   *bucket[BUCKET_SIZE];
 connection   *cxtbuffer = NULL;
-static char  *dev,*dpath;
+static char  *dev,*dpath,*chroot_dir;
 static char  *group_name, *user_name, *true_pid_name;
 static char  *pidfile = "cxtracker.pid";
 static char  *pidpath = "/var/run";
@@ -566,6 +566,35 @@ void dump_active() {
    }
 }
 
+static int set_chroot(void) {
+   char *absdir;
+   char *logdir;
+   int abslen;
+   
+   /* logdir = get_abs_path(logpath); */
+
+   /* change to the directory */
+   if ( chdir(chroot_dir) != 0 ) {
+      printf("set_chroot: Can not chdir to \"%s\": %s\n",chroot_dir,strerror(errno));
+   }
+
+   /* always returns an absolute pathname */
+   absdir = getcwd(NULL, 0);
+   abslen = strlen(absdir);
+   
+   /* make the chroot call */
+   if ( chroot(absdir) < 0 ) {
+      printf("Can not chroot to \"%s\": absolute: %s: %s\n",chroot_dir,absdir,strerror(errno));
+   }
+
+   if ( chdir("/") < 0 ) {
+        printf("Can not chdir to \"/\" after chroot: %s\n",strerror(errno));
+   }   
+
+   return 0;
+}
+
+
 static int drop_privs(void) {
    struct group *gr;
    struct passwd *pw;
@@ -751,13 +780,14 @@ static void usage() {
     printf(" -u             : user\n");
     printf(" -g             : group\n");
     printf(" -D             : enables daemon mode\n");
+    printf(" -T             : dir to chroot into\n");
     printf(" -h             : this help message\n");
     printf(" -v             : verbose\n\n");
 }
 
 int main(int argc, char *argv[]) {
 
-   int ch, fromfile, setfilter, version, drop_privs_flag, daemon_flag;
+   int ch, fromfile, setfilter, version, drop_privs_flag, daemon_flag, chroot_flag;
    int use_syslog = 0;
    struct in_addr addr;
    struct bpf_program cfilter;
@@ -767,10 +797,11 @@ int main(int argc, char *argv[]) {
    ch = fromfile = setfilter = version = drop_privs_flag = daemon_flag = 0;
    dev = "eth0";
    bpff = "";
-   dpath = "/tmp";
+   chroot_dir = "/tmp/";
+   dpath = "./";
    cxtbuffer = NULL;
    cxtrackerid  = 0;
-   inpacket = intr_flag = 0;
+   inpacket = intr_flag = chroot_flag = 0;
    timecnt = time(NULL);
 
    signal(SIGTERM, game_over);
@@ -780,7 +811,7 @@ int main(int argc, char *argv[]) {
    /* signal(SIGALRM, end_sessions); */
    /* alarm(TIMEOUT); */
 
-   while ((ch = getopt(argc, argv, "b:d:Dg:hi:p:P:u:v")) != -1)
+   while ((ch = getopt(argc, argv, "b:d:DT:g:hi:p:P:u:v")) != -1)
    switch (ch) {
       case 'i':
          dev = strdup(optarg);
@@ -800,6 +831,9 @@ int main(int argc, char *argv[]) {
          break;
       case 'D':
          daemon_flag = 1;
+         break;
+      case 'T':
+         chroot_flag = 1;
          break;
       case 'u':
          user_name = strdup(optarg);
@@ -834,19 +868,27 @@ int main(int argc, char *argv[]) {
 
    if ((handle = pcap_open_live(dev, 65535, 1, 500, errbuf)) == NULL) {
       printf("[*] Error pcap_open_live: %s \n", errbuf);
+      pcap_close(handle);
       exit(1);
    }
    else if ((pcap_compile(handle, &cfilter, bpff, 1 ,net_mask)) == -1) {
       printf("[*] Error pcap_compile user_filter: %s\n", pcap_geterr(handle));
+      pcap_close(handle);
       exit(1);
    }
 
    pcap_setfilter(handle, &cfilter);
+   pcap_freecode(&cfilter); // filter code not needed after setfilter
 
    /* B0rk if we see an error... */
    if (strlen(errbuf) > 0) {
       printf("[*] Error errbuf: %s \n", errbuf);
+      pcap_close(handle);
       exit(1);
+   }
+
+   if ( chroot_flag == 1 ) {
+      set_chroot();
    }
 
    if(daemon_flag) {
