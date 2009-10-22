@@ -62,6 +62,7 @@ void cxtbuffer_write();
 void game_over();
 void check_interupt();
 void dump_active();
+void set_end_sessions();
 
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet) {
    if ( intr_flag != 0 ) { check_interupt(); }
@@ -234,11 +235,12 @@ void cx_track4(uint64_t ip_src,uint16_t src_port,uint64_t ip_dst,uint16_t dst_po
 
       /* New connections are pushed on to the head of bucket[s_hash] */
       bucket[hash] = cxt;
-
+      /*
       if ( ((tstamp - timecnt) > TIMEOUT) ) {
          timecnt = time(NULL);
          end_sessions();
-      }
+         cxtbuffer_write();
+      }*/
       return;
    }
    /* Should never be here! */
@@ -308,11 +310,12 @@ void cx_track6(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,u
       cxt->prev           = NULL;
 
       bucket[hash] = cxt;
-
+      /*
       if ( ((tstamp - timecnt) > TIMEOUT) ) {
          timecnt = time(NULL);
          end_sessions();
-      }
+         cxtbuffer_write();
+      }*/
       return;
    }
    /* Should never be here! */
@@ -387,7 +390,6 @@ void end_sessions() {
       }
    }
    /* printf("Expired: %u of %u total connections:\n",expired,curcxt); */
-   cxtbuffer_write(); 
 }
 
 void move_connection (connection* cxt, connection **bucket_ptr ){
@@ -541,8 +543,21 @@ void check_interupt() {
    else if ( intr_flag == 2 ) {
       dump_active();
    }
+   else if ( intr_flag == 3 ) {
+      set_end_sessions();
+   }
    else {
       intr_flag = 0;
+   }
+}
+
+void set_end_sessions() {
+   intr_flag = 3;
+   if ( inpacket == 0 ) {
+      end_sessions();
+      cxtbuffer_write();
+      intr_flag = 0;
+      alarm(TIMEOUT);
    }
 }
 
@@ -808,8 +823,7 @@ int main(int argc, char *argv[]) {
    signal(SIGINT,  game_over);
    signal(SIGQUIT, game_over);
    signal(SIGHUP,  dump_active);
-   /* signal(SIGALRM, end_sessions); */
-   /* alarm(TIMEOUT); */
+   signal(SIGALRM, set_end_sessions); 
 
    while ((ch = getopt(argc, argv, "b:d:DT:g:hi:p:P:u:v")) != -1)
    switch (ch) {
@@ -866,7 +880,7 @@ int main(int argc, char *argv[]) {
    if (dev == 0x0) dev = pcap_lookupdev(errbuf);
    printf("[*] Device: %s\n", dev);
 
-   if ((handle = pcap_open_live(dev, 65535, 1, 500, errbuf)) == NULL) {
+   if ((handle = pcap_open_live(dev, SNAPLENGTH, 1, 500, errbuf)) == NULL) {
       printf("[*] Error pcap_open_live: %s \n", errbuf);
       pcap_close(handle);
       exit(1);
@@ -905,6 +919,7 @@ int main(int argc, char *argv[]) {
    } 
    bucket_keys_NULL();
 
+   alarm(TIMEOUT);
    printf("[*] Sniffing...\n\n");
    pcap_loop(handle,-1,got_packet,NULL);
 
