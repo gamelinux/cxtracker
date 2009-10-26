@@ -234,7 +234,7 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
    }
 
    if ( cxt == NULL ) {
-      extern u_int64_t cxtrackerid;
+      u_int64_t cxtrackerid;
       cxtrackerid += 1;
       cxt = (connection*) calloc(1, sizeof(connection));
       if (head != NULL ) {

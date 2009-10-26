@@ -123,7 +123,6 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
 void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,uint16_t dst_port,
                uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af) {
 
-   //extern connection *bucket[BUCKET_SIZE];
    connection *cxt = NULL;
    connection *head = NULL;
    uint64_t hash;
@@ -182,7 +181,7 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
    }
 
    if ( cxt == NULL ) {
-      extern u_int64_t cxtrackerid;
+      u_int64_t cxtrackerid;
       cxtrackerid += 1;
       if (cxtfree != NULL) {
          /* Use a connection from cxtfree */
