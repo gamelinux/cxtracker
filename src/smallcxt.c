@@ -268,9 +268,9 @@ void end_sessions() {
          }
       }
    }
-   printf("Expired: %u of %u total connections:\n",expired,curcxt);
+   fprintf(stderr, "Expired: %u of %u total connections:\n",expired,curcxt);
    cxtbuffer_write();
-   printf("End.\n");
+   fprintf(stderr, "End.\n");
 }
 
 void clear_connection (connection *cxt){
@@ -313,7 +313,7 @@ void move_connection (connection *cxt_from, connection **bucket_ptr_from, connec
    if(prev == NULL){
       // beginning of list
       *bucket_ptr_from = next;
-      // not only entry
+      // not the only entry
       if(next)
          next->prev = NULL;
    } else if(next == NULL){
@@ -326,13 +326,13 @@ void move_connection (connection *cxt_from, connection **bucket_ptr_from, connec
    }
 
    /* add cxt to expired list cxtbuffer 
-    - if head is null -> head = cxt;
-    */
+    - if head is null -> head = cxt; */
    cxt_from->next = *cxt_to; // next = head
    cxt_from->prev = NULL;
    *cxt_to = cxt_from;       // head = cxt. result: newhead = cxt->oldhead->list...
 }
 
+/* flush connection buffer to output */
 void cxtbuffer_write () {
 
    if ( cxtbuffer == NULL ) { return; }
@@ -342,29 +342,24 @@ void cxtbuffer_write () {
    head = cxtbuffer;
 
    while ( cxtbuffer != NULL ) {
-      next = NULL;
-      //debug = cxtbuffer;
-//      if(cxtbuffer == cxtbuffer->next){
-//         cxtbuffer->next = NULL;
-//      }
       next = cxtbuffer->next;
-      //free(cxtbuffer);
-      //move_connection(cxtbuffer, &cxtbuffer, &cxtfree);
-      // pop from cxtbuffer, push to cxtfree
+
+      // free connection:
+      //pop from cxtbuffer, push to cxtfree
       cxtbuffer->next = cxtfree;
       cxtfree = cxtbuffer;
       cxtbuffer = next;
 
       cxtfree->prev = NULL;
 
-      // clear connection
       clear_connection(cxtfree);
+      printf("[*] cxtfree'd a connection\n");
       //debug = NULL;
    }
 
 //   if (head != NULL ) { free(head); }
    /* just write something*/
-   printf("Done...\n");
+   fprintf(stderr, "Done...\n");
 }
 
 void add_connections() {
@@ -373,7 +368,7 @@ void add_connections() {
 
    for ( cxkey = 0; cxkey < 2; cxkey++ ) {
       cxt = (connection*) calloc(1, sizeof(connection));
-      clear_connection(cxt);
+      //clear_connection(cxt); // already calloced!
       if (cxtfree != NULL) {
          cxt->next = cxtfree;
          cxtfree->prev = cxt;
