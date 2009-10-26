@@ -24,8 +24,9 @@
 
 /*  D E F I N E S  ************************************************************/
 #define VERSION                       "0.9.1"
-#define TIMEOUT                       60
+#define TIMEOUT                       45
 #define BUCKET_SIZE                   1211
+#define SNAPLENGTH                    1600
 
 #define ETHERNET_TYPE_IP              0x0800
 #define ETHERNET_TYPE_ARP             0x0806
@@ -297,25 +298,23 @@ typedef struct _icmp6_header {
  */
 
 typedef struct _connection {
-        int ipversion;                     /* IP version (4/6) */
-        u_int8_t  proto;                   /* IP protocoll type */
-        uint32_t s_ip4;                    /* source address */
-        uint32_t d_ip4;                    /* destination address */
-        struct in6_addr s_ip6;             /* source address */
-        struct in6_addr d_ip6;             /* destination address */
-        u_int16_t s_port;                  /* source port */
-        u_int16_t d_port;                  /* destination port */
-        u_int64_t s_total_pkts;            /* total source packets */
-        u_int64_t s_total_bytes;           /* total source bytes */
-        u_int64_t d_total_pkts;            /* total destination packets */
-        u_int64_t d_total_bytes;           /* total destination bytes */
-        u_int8_t s_tcpFlags;               /* tcpflags sent by source */
-        u_int8_t d_tcpFlags;               /* tcpflags sent by destination */
-        time_t start_time;                 /* connection start time */
-        time_t last_pkt_time;              /* last seen packet time */
-        u_int64_t cxid;                    /* connection id */
-        struct _connection *prev;
-        struct _connection *next;
+        u_int64_t  cxid;                /* connection id */
+        int        ipversion;           /* IP version (4/6) */
+        u_int8_t   proto;               /* IP protocoll type */
+        struct     in6_addr s_ip;       /* source address */
+        struct     in6_addr d_ip;       /* destination address */
+        u_int16_t  s_port;              /* source port */
+        u_int16_t  d_port;              /* destination port */
+        u_int64_t  s_total_pkts;        /* total source packets */
+        u_int64_t  s_total_bytes;       /* total source bytes */
+        u_int64_t  d_total_pkts;        /* total destination packets */
+        u_int64_t  d_total_bytes;       /* total destination bytes */
+        u_int8_t   s_tcpFlags;          /* tcpflags sent by source */
+        u_int8_t   d_tcpFlags;          /* tcpflags sent by destination */
+        time_t     start_time;          /* connection start time */
+        time_t     last_pkt_time;       /* last seen packet time */
+        struct _connection *prev;       /* Pointer to prev connection */
+        struct _connection *next;       /* Pointer to next connection */
 } connection;
 
 /*  P R O T O T Y P E S  ******************************************************/

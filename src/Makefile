@@ -16,5 +16,5 @@ profile:
 	gcc -o cxtracker cxtracker.c -lpcap $(PCFLAGS)
 
 clean:
-	rm cxtracker cxtsmall 
+	rm cxtracker smallcxt 
 
