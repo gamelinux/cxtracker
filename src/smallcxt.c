@@ -42,7 +42,8 @@ static char  *dev,*dpath;
 static int   verbose, inpacket, gameover, use_syslog;
 
 /*  I N T E R N A L   P R O T O T Y P E S  ************************************/
-void move_connection (connection*, connection**, connection*);
+void move_connection (connection*, connection**, connection**);
+void clear_connection (connection*);
 void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,uint16_t dst_port,uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af);
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet);
 void end_sessions();
@@ -186,10 +187,9 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
       if (cxtfree != NULL) {
          /* Use a connection from cxtfree */
          //move_connection(cxtfree, &cxtfree, cxt);
-         connection *next;
-         next = cxtfree->next;
+         // pop a connection from cxtfree
          cxt = cxtfree;
-         cxtfree = next;
+         cxtfree = cxtfree->next;
          printf("[*] Used connection from cxtfree...\n");
       }else{
          /* Allocate memory for a new connection */
@@ -262,7 +262,7 @@ void end_sessions() {
             connection *tmp = cxt;
             assert(cxt != cxt->next);
             cxt = cxt->next;
-            move_connection(tmp, &bucket[cxkey], cxtbuffer);
+            move_connection(tmp, &bucket[cxkey], &cxtbuffer);
          }else{
             cxt = cxt->next;
          }
@@ -273,71 +273,9 @@ void end_sessions() {
    printf("End.\n");
 }
 
-/* move cxt from bucket to cxtbuffer
- * there are three cases usually:
- * either, we are in the middle of list. Update next and prev
- * or, we are at end of list, next==NULL, update prev->next = NULL
-
-*/
-void move_connection (connection *cxt_from, connection **bucket_ptr_from, connection *cxt_to ){
-   /* remove cxt from bucket */
-   connection *prev = cxt_from->prev; /* OLDER connections */
-   connection *next = cxt_from->next; /* NEWER connections */
-   if(prev == NULL){
-      // beginning of list
-      *bucket_ptr_from = next;
-      // not only entry
-      if(next)
-         next->prev = NULL;
-   } else if(next == NULL){
-      // at end of list!
-      prev->next = NULL;
-   } else {
-      // a node.
-      prev->next = next;
-      next->prev = prev;
-   }
-
-   /* add cxt to expired list cxtbuffer 
-    - if head is null -> head = cxt;
-    */
-   cxt_from->next = cxt_to; // next = head
-   cxt_from->prev = NULL;
-   cxt_to = cxt_from;       // head = cxt. result: newhead = cxt->oldhead->list...
-}
-
-void cxtbuffer_write () {
-
-   if ( cxtbuffer == NULL ) { return; }
-   connection *next, *debug, *head;
-   next = NULL;
-   debug = NULL;
-   head = cxtbuffer;
-
-   while ( cxtbuffer != NULL ) {
-      next = NULL;
-      //debug = cxtbuffer;
-//      if(cxtbuffer == cxtbuffer->next){
-//         cxtbuffer->next = NULL;
-//      }
-      next = cxtbuffer->next;
-      //free(cxtbuffer);
-      move_connection(cxtbuffer, &cxtbuffer, cxtfree);
-      //debug = NULL;
-      cxtbuffer = next;
-   }
-
-//   if (head != NULL ) { free(head); }
-   /* just write something*/
-   printf("Done...\n");
-}
-
-void add_connections() {
-   int cxkey;
-   connection *cxt;
-
-   for ( cxkey = 0; cxkey < 2; cxkey++ ) {
-      cxt = (connection*) calloc(1, sizeof(connection));
+void clear_connection (connection *cxt){
+      memset(cxt, 0, sizeof(*cxt));
+      /*
       cxt->cxid              = 0;
       cxt->ipversion         = 0;
       cxt->s_tcpFlags        = 0x00;
@@ -359,7 +297,83 @@ void add_connections() {
       cxt->s_port            = 0;
       cxt->d_port            = 0;
       cxt->proto             = 0;
+      */
+}
 
+/* move cxt from bucket to cxtbuffer
+ * there are three cases usually:
+ * either, we are in the middle of list. Update next and prev
+ * or, we are at end of list, next==NULL, update prev->next = NULL
+
+*/
+void move_connection (connection *cxt_from, connection **bucket_ptr_from, connection **cxt_to ){
+   /* remove cxt from bucket */
+   connection *prev = cxt_from->prev; /* OLDER connections */
+   connection *next = cxt_from->next; /* NEWER connections */
+   if(prev == NULL){
+      // beginning of list
+      *bucket_ptr_from = next;
+      // not only entry
+      if(next)
+         next->prev = NULL;
+   } else if(next == NULL){
+      // at end of list!
+      prev->next = NULL;
+   } else {
+      // a node.
+      prev->next = next;
+      next->prev = prev;
+   }
+
+   /* add cxt to expired list cxtbuffer 
+    - if head is null -> head = cxt;
+    */
+   cxt_from->next = *cxt_to; // next = head
+   cxt_from->prev = NULL;
+   *cxt_to = cxt_from;       // head = cxt. result: newhead = cxt->oldhead->list...
+}
+
+void cxtbuffer_write () {
+
+   if ( cxtbuffer == NULL ) { return; }
+   connection *next, *debug, *head;
+   next = NULL;
+   debug = NULL;
+   head = cxtbuffer;
+
+   while ( cxtbuffer != NULL ) {
+      next = NULL;
+      //debug = cxtbuffer;
+//      if(cxtbuffer == cxtbuffer->next){
+//         cxtbuffer->next = NULL;
+//      }
+      next = cxtbuffer->next;
+      //free(cxtbuffer);
+      //move_connection(cxtbuffer, &cxtbuffer, &cxtfree);
+      // pop from cxtbuffer, push to cxtfree
+      cxtbuffer->next = cxtfree;
+      cxtfree = cxtbuffer;
+      cxtbuffer = next;
+
+      cxtfree->prev = NULL;
+
+      // clear connection
+      clear_connection(cxtfree);
+      //debug = NULL;
+   }
+
+//   if (head != NULL ) { free(head); }
+   /* just write something*/
+   printf("Done...\n");
+}
+
+void add_connections() {
+   int cxkey;
+   connection *cxt;
+
+   for ( cxkey = 0; cxkey < 2; cxkey++ ) {
+      cxt = (connection*) calloc(1, sizeof(connection));
+      clear_connection(cxt);
       if (cxtfree != NULL) {
          cxt->next = cxtfree;
          cxtfree->prev = cxt;
