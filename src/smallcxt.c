@@ -346,7 +346,7 @@ void move_connection (connection *cxt_from, connection **bucket_ptr_from, connec
 void cxtbuffer_write () {
 
    if ( cxtbuffer == NULL ) { return; }
-   connection *next, oldhead;
+   connection *next, *oldhead;
    next = NULL;
 
    while ( cxtbuffer != NULL ) {
