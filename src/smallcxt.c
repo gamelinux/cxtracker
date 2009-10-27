@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <signal.h>
 #include <netinet/in.h>
 #include <pcap.h>
 #include <getopt.h>
@@ -39,7 +40,8 @@ connection   *bucket[BUCKET_SIZE], *cxtfree;
 connection   *cxtbuffer = NULL;
 static char  src_s[INET6_ADDRSTRLEN], dst_s[INET6_ADDRSTRLEN];
 static char  *dev,*dpath;
-static int   verbose, inpacket, gameover, use_syslog;
+static int   verbose, inpacket, intr_flag, gameover, use_syslog;
+static uint64_t   freecnt, buffercnt, cxtcnt;
 
 /*  I N T E R N A L   P R O T O T Y P E S  ************************************/
 void move_connection (connection*, connection**, connection**);
@@ -48,10 +50,14 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet);
 void end_sessions();
 void cxtbuffer_write();
+void game_over();
+void check_interupt();
+void dump_active();
+void set_end_sessions();
+
 
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet) {
-//   if ( gameover == 1 ) { game_over(); }
-   end_sessions();
+   if ( intr_flag != 0 ) { check_interupt(); }
    inpacket = 1;
    tstamp = time(NULL);
    u_short p_bytes;
@@ -130,9 +136,9 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
 
    if (af == AF_INET) {
       hash = (( ip_src.s6_addr32[0] + ip_dst.s6_addr32[0] )) % BUCKET_SIZE;
-   } else
+   } else {
    /* Do we need an if? */
-   if (af == AF_INET6) {
+   /* if (af == AF_INET6) { */
       hash = ((  ip_src.s6_addr32[0] + ip_src.s6_addr32[1] + ip_src.s6_addr32[2] + ip_src.s6_addr32[3]
                + ip_dst.s6_addr32[0] + ip_dst.s6_addr32[1] + ip_dst.s6_addr32[2] + ip_dst.s6_addr32[3]
              )) % BUCKET_SIZE;
@@ -158,9 +164,9 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
             cxt->last_pkt_time  = tstamp;
             return;
          }
-      } else
+      } else {
       /* Do we need an if ? */
-      if (af == AF_INET6) {
+      /* if (af == AF_INET6) { */
             if ( memcmp(&cxt->s_ip,&ip_src,16) && memcmp(&cxt->d_ip,&ip_dst,16) &&
                  cxt->s_port == src_port && cxt->d_port == dst_port ) {
                cxt->s_tcpFlags    |= tcpflags;
@@ -184,13 +190,15 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
    if ( cxt == NULL ) {
       u_int64_t cxtrackerid;
       cxtrackerid += 1;
+      cxtcnt += 1;
       if (cxtfree != NULL) {
          /* Use a connection from cxtfree */
          //move_connection(cxtfree, &cxtfree, cxt);
          // pop a connection from cxtfree
          cxt = cxtfree;
          cxtfree = cxtfree->next;
-         printf("[*] Used connection from cxtfree...\n");
+         //printf("[*] Re-used a connection from cxtfree...\n");
+         freecnt -= 1;
       }else{
          /* Allocate memory for a new connection */
          cxt = (connection*) calloc(1, sizeof(connection));
@@ -253,7 +261,7 @@ void end_sessions() {
       xpir = 0;
       while ( cxt != NULL ) {
          curcxt++;
-         if ( (check_time - cxt->last_pkt_time) > 5 ) {
+         if ( (check_time - cxt->last_pkt_time) > 30 ) {
             xpir = 1;
          }
          if ( xpir == 1 ) {
@@ -263,29 +271,30 @@ void end_sessions() {
             assert(cxt != cxt->next);
             cxt = cxt->next;
             move_connection(tmp, &bucket[cxkey], &cxtbuffer);
+            cxtcnt -= 1; 
          }else{
             cxt = cxt->next;
          }
       }
    }
-   fprintf(stderr, "Expired: %u of %u total connections:\n",expired,curcxt);
+   fprintf(stderr, "[*] Expired: %u of %u total connections:\n",expired,curcxt);
    cxtbuffer_write();
-   fprintf(stderr, "End.\n");
+//   fprintf(stderr, "[*] End.\n");
+   printf("[*] cnxfree:%ju\tbucket:%ju\n",freecnt,cxtcnt);
 }
 
 void clear_connection (connection *cxt){
-      memset(cxt, 0, sizeof(*cxt));
-      /*
-      cxt->cxid              = 0;
-      cxt->ipversion         = 0;
-      cxt->s_tcpFlags        = 0x00;
-      cxt->d_tcpFlags        = 0x00;
-      cxt->s_total_bytes     = 0;
-      cxt->s_total_pkts      = 0;
-      cxt->d_total_bytes     = 0;
-      cxt->d_total_pkts      = 0;
-      cxt->start_time        = 0;
-      cxt->last_pkt_time     = 0;
+      /* memset(cxt, 0, sizeof(*cxt)); */
+      cxt->cxid = 0;
+      cxt->ipversion = 0;
+      cxt->s_tcpFlags = 0x00;
+      cxt->d_tcpFlags = 0x00;
+      cxt->s_total_bytes = 0;
+      cxt->s_total_pkts = 0;
+      cxt->d_total_bytes = 0;
+      cxt->d_total_pkts = 0;
+      cxt->start_time = 0;
+      cxt->last_pkt_time = 0;
       cxt->s_ip.s6_addr32[0] = 0;
       cxt->s_ip.s6_addr32[1] = 0;
       cxt->s_ip.s6_addr32[2] = 0;
@@ -294,10 +303,9 @@ void clear_connection (connection *cxt){
       cxt->d_ip.s6_addr32[1] = 0;
       cxt->d_ip.s6_addr32[2] = 0;
       cxt->d_ip.s6_addr32[3] = 0;
-      cxt->s_port            = 0;
-      cxt->d_port            = 0;
-      cxt->proto             = 0;
-      */
+      cxt->s_port = 0;
+      cxt->d_port = 0;
+      cxt->proto = 0;
 }
 
 /* move cxt from bucket to cxtbuffer
@@ -336,10 +344,8 @@ void move_connection (connection *cxt_from, connection **bucket_ptr_from, connec
 void cxtbuffer_write () {
 
    if ( cxtbuffer == NULL ) { return; }
-   connection *next, *debug, *head;
+   connection *next;
    next = NULL;
-   debug = NULL;
-   head = cxtbuffer;
 
    while ( cxtbuffer != NULL ) {
       next = cxtbuffer->next;
@@ -351,22 +357,60 @@ void cxtbuffer_write () {
       cxtbuffer = next;
 
       cxtfree->prev = NULL;
-
+      freecnt += 1;
       clear_connection(cxtfree);
-      printf("[*] cxtfree'd a connection\n");
+      //printf("[*] cxtfree'd a connection\n");
       //debug = NULL;
    }
 
 //   if (head != NULL ) { free(head); }
    /* just write something*/
-   fprintf(stderr, "Done...\n");
+//   fprintf(stderr, "Done...\n");
+}
+
+void check_interupt() {
+   if ( intr_flag == 1 ) {
+      game_over();
+   }
+/*
+   else if ( intr_flag == 2 ) {
+      dump_active();
+   }
+*/
+   else if ( intr_flag == 3 ) {
+      set_end_sessions();
+   }
+   else {
+      intr_flag = 0;
+   }
+}
+
+void set_end_sessions() {
+   intr_flag = 3;
+   if ( inpacket == 0 ) {
+      end_sessions();
+      cxtbuffer_write();
+      intr_flag = 0;
+      alarm(TIMEOUT);
+   }
+}
+
+void game_over() {
+   if ( inpacket == 0 ) {
+      //end_all_sessions();
+      cxtbuffer_write();
+      pcap_close(handle);
+      exit (0);
+   }
+   intr_flag = 1;
 }
 
 void add_connections() {
    int cxkey;
    connection *cxt;
 
-   for ( cxkey = 0; cxkey < 2; cxkey++ ) {
+   for ( cxkey = 0; cxkey < BUCKET_SIZE * 9; cxkey++ ) {
+      freecnt += 1;
       cxt = (connection*) calloc(1, sizeof(connection));
       //clear_connection(cxt); // already calloced!
       if (cxtfree != NULL) {
@@ -396,6 +440,7 @@ int main(int argc, char *argv[]) {
    cxtbuffer = NULL;
    cxtrackerid  = 9999999999;
    inpacket = gameover = 0;
+   freecnt = buffercnt = cxtcnt = 0;
    timecnt = time(NULL);
 
    if (getuid()) {
@@ -404,10 +449,10 @@ int main(int argc, char *argv[]) {
    }
    printf("[*] Running cxtracker...\n");
 
-//   signal(SIGTERM, game_over);
-//   signal(SIGINT,  game_over);
-//   signal(SIGQUIT, game_over);
-//   signal(SIGALRM, end_sessions);
+   signal(SIGTERM, game_over);
+   signal(SIGINT,  game_over);
+   signal(SIGQUIT, game_over);
+   signal(SIGALRM, set_end_sessions);
    /* alarm(TIMEOUT); */
 
    while ((ch = getopt(argc, argv, "b:d:D:g:i:p:P:u:v")) != -1)
@@ -455,6 +500,7 @@ int main(int argc, char *argv[]) {
       exit(1);
    }
 
+   alarm(TIMEOUT);
    printf("[*] Sniffing...\n\n");
    pcap_loop(handle,-1,got_packet,NULL);
 
