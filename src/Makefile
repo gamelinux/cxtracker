@@ -9,10 +9,10 @@ all: cxtracker
 #gcc -o cxtracker cxtracker.c -lpcap $(OCFLAGS)
 
 debug: 
-	gcc -o cxtracker cxtracker.c -lpcap $(DCFLAGS)
+	gcc $(DCFLAGS) -o cxtracker cxtracker.c -lpcap
 
 profile:
-	gcc -o cxtracker cxtracker.c -lpcap $(PCFLAGS)
+	gcc $(PCFLAGS) -o cxtracker cxtracker.c -lpcap
 
 clean:
 	-rm -v cxtracker smallcxt cxtracker.o

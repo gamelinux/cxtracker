@@ -359,7 +359,7 @@ void cxtbuffer_write () {
       cxtbuffer = next;
 
       freecnt += 1;
-      clear_connection(cxtfree);
+      //clear_connection(cxtfree);
       cxtfree->next = oldhead;
       //printf("[*] cxtfree'd a connection\n");
       //debug = NULL;

@@ -23,7 +23,7 @@
 /*  I N C L U D E S  **********************************************************/
 
 /*  D E F I N E S  ************************************************************/
-#define VERSION                       "0.9.1"
+#define VERSION                       "0.9.2"
 #define TIMEOUT                       45
 #define BUCKET_SIZE                   1211
 #define SNAPLENGTH                    1600
