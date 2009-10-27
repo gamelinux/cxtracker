@@ -284,7 +284,8 @@ void end_sessions() {
 }
 
 void clear_connection (connection *cxt){
-      /* memset(cxt, 0, sizeof(*cxt)); */
+      memset(cxt, 0, sizeof(*cxt));
+      /*
       cxt->cxid = 0;
       cxt->ipversion = 0;
       cxt->s_tcpFlags = 0x00;
@@ -306,6 +307,7 @@ void clear_connection (connection *cxt){
       cxt->s_port = 0;
       cxt->d_port = 0;
       cxt->proto = 0;
+      */
 }
 
 /* move cxt from bucket to cxtbuffer
@@ -344,21 +346,21 @@ void move_connection (connection *cxt_from, connection **bucket_ptr_from, connec
 void cxtbuffer_write () {
 
    if ( cxtbuffer == NULL ) { return; }
-   connection *next;
+   connection *next, oldhead;
    next = NULL;
 
    while ( cxtbuffer != NULL ) {
+      oldhead = cxtfree;
       next = cxtbuffer->next;
 
       // free connection:
       //pop from cxtbuffer, push to cxtfree
-      cxtbuffer->next = cxtfree;
       cxtfree = cxtbuffer;
       cxtbuffer = next;
 
-      cxtfree->prev = NULL;
       freecnt += 1;
       clear_connection(cxtfree);
+      cxtfree->next = oldhead;
       //printf("[*] cxtfree'd a connection\n");
       //debug = NULL;
    }

@@ -1,20 +1,19 @@
 #Makefile
 
-CC=gcc
 OCFLAGS=-O3
 DCFLAGS=-g
 PCFLAGS=-g -pg
+LDFLAGS=-lpcap
 
+all: cxtracker
+#gcc -o cxtracker cxtracker.c -lpcap $(OCFLAGS)
 
-all:
-	gcc -o cxtracker cxtracker.c -lpcap $(OCFLAGS)
-
-debug:
+debug: 
 	gcc -o cxtracker cxtracker.c -lpcap $(DCFLAGS)
 
 profile:
 	gcc -o cxtracker cxtracker.c -lpcap $(PCFLAGS)
 
 clean:
-	rm cxtracker smallcxt 
+	-rm -v cxtracker smallcxt cxtracker.o
 
