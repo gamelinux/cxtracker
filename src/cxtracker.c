@@ -168,7 +168,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
    inpacket = 0;
    return;
    /* else { */
-      /* printf("[*] ETHERNET TYPE : %x\n", eth_hdr->eth_ip_type); */
+   /*   printf("[*] ETHERNET TYPE : %x\n", eth_hdr->eth_ip_type); */
    /*   return; */
    /* } */
 }
@@ -183,11 +183,9 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
    if (af == AF_INET) {
       hash = (( ip_src.s6_addr32[0] + ip_dst.s6_addr32[0] )) % BUCKET_SIZE;
    } else {
-   /* Do we need an if? */
-   /* if (af == AF_INET6) { */
       hash = ((  ip_src.s6_addr32[0] + ip_src.s6_addr32[1] + ip_src.s6_addr32[2] + ip_src.s6_addr32[3]
                + ip_dst.s6_addr32[0] + ip_dst.s6_addr32[1] + ip_dst.s6_addr32[2] + ip_dst.s6_addr32[3]
-             )) % BUCKET_SIZE;
+             ))  % BUCKET_SIZE;
    }
 
    cxt = bucket[hash];
@@ -211,24 +209,21 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
             return;
          }
       } else {
-      /* Do we need an if ? */
-      /* if (af == AF_INET6) { */
-            if ( memcmp(&cxt->s_ip,&ip_src,16) && memcmp(&cxt->d_ip,&ip_dst,16) &&
-                 cxt->s_port == src_port && cxt->d_port == dst_port ) {
-               cxt->s_tcpFlags    |= tcpflags;
-               cxt->s_total_bytes += p_bytes;
-               cxt->s_total_pkts  += 1;
-               cxt->last_pkt_time  = tstamp;
-               return;
-            } else
-            if ( memcmp(&cxt->s_ip,&ip_dst,16) && memcmp(&cxt->d_ip,&ip_src,16) &&
-                 cxt->d_port == src_port && cxt->s_port == dst_port ) {
-               cxt->d_tcpFlags    |= tcpflags;
-               cxt->d_total_bytes += p_bytes;
-               cxt->d_total_pkts  += 1;
-               cxt->last_pkt_time  = tstamp;
-               return;
-            }
+         if ( memcmp(&cxt->s_ip,&ip_src,16) && memcmp(&cxt->d_ip,&ip_dst,16)
+              && cxt->s_port == src_port && cxt->d_port == dst_port ) {
+            cxt->s_tcpFlags    |= tcpflags;
+            cxt->s_total_bytes += p_bytes;
+            cxt->s_total_pkts  += 1;
+            cxt->last_pkt_time  = tstamp;
+            return;
+         } else if ( memcmp(&cxt->s_ip,&ip_dst,16) && memcmp(&cxt->d_ip,&ip_src,16)
+                     && cxt->d_port == src_port && cxt->s_port == dst_port ) {
+            cxt->d_tcpFlags    |= tcpflags;
+            cxt->d_total_bytes += p_bytes;
+            cxt->d_total_pkts  += 1;
+            cxt->last_pkt_time  = tstamp;
+            return;
+         }
       }
       cxt = cxt->next;
    }
@@ -244,16 +239,18 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
       cxt->cxid           = cxtrackerid;
       cxt->ipversion      = af;
       cxt->s_tcpFlags     = tcpflags;
-      cxt->d_tcpFlags     = 0x00;
+      /* cxt->d_tcpFlags     = 0x00; */
       cxt->s_total_bytes  = p_bytes;
       cxt->s_total_pkts   = 1;
-      cxt->d_total_bytes  = 0;
-      cxt->d_total_pkts   = 0;
+      /* cxt->d_total_bytes  = 0; */
+      /* cxt->d_total_pkts   = 0; */
       cxt->start_time     = tstamp;
       cxt->last_pkt_time  = tstamp;
 
       cxt->s_ip          = ip_src;
       cxt->d_ip          = ip_dst;
+      /* This should be Zeroed due to calloc */
+      /*
       if (af == AF_INET) { 
          cxt->s_ip.s6_addr32[1]          = 0; 
          cxt->s_ip.s6_addr32[2]          = 0; 
@@ -262,7 +259,7 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
          cxt->d_ip.s6_addr32[2]          = 0; 
          cxt->d_ip.s6_addr32[3]          = 0; 
       } 
-
+      */
       cxt->s_port         = src_port;
       cxt->d_port         = dst_port;
       cxt->proto          = ip_proto;
@@ -341,7 +338,7 @@ void end_sessions() {
             }
             cxt = cxt->next;
             move_connection(tmp, &bucket[cxkey]);
-         }else{
+         } else {
             cxt = cxt->next;
          }
       }
@@ -353,27 +350,27 @@ void move_connection (connection *cxt_from, connection **bucket_ptr_from) {
    /* remove cxt from bucket */
    connection *prev = cxt_from->prev; /* OLDER connections */
    connection *next = cxt_from->next; /* NEWER connections */
-   if(prev == NULL){
-      // beginning of list
+   if ( prev == NULL ) {
+      /* beginning of list */
       *bucket_ptr_from = next;
-      // not only entry
-      if(next)
+      /* not only entry */
+      if ( next )
          next->prev = NULL;
-   } else if(next == NULL){
-      // at end of list!
+   } else if ( next == NULL ) {
+      /* at end of list! */
       prev->next = NULL;
    } else {
-      // a node.
+      /* a node */
       prev->next = next;
       next->prev = prev;
    }
 
    /* add cxt to expired list cxtbuffer 
-    - if head is null -> head = cxt;
+    * - if head is null -> head = cxt;
     */
-   cxt_from->next = cxtbuffer; // next = head
+   cxt_from->next = cxtbuffer; /* next = head */
    cxt_from->prev = NULL;
-   cxtbuffer = cxt_from;       // head = cxt. result: newhead = cxt->oldhead->list...
+   cxtbuffer = cxt_from;       /* head = cxt. result: newhead = cxt->oldhead->list... */
 }
 
 void cxtbuffer_write () {
@@ -439,7 +436,6 @@ void cxtbuffer_write () {
          }
 
          if ( cxtbuffer->ipversion == AF_INET6 ) {
-            /* Use string for now for IPv6. Most likly one should use unsigned for each fields in IPv6 */
             if ( verbose != 1 ) {
                if (!inet_ntop(AF_INET6, &cxtbuffer->s_ip, src_s, INET6_ADDRSTRLEN + 1 ))
                   perror("Something died in inet_ntop");
@@ -565,7 +561,6 @@ static int set_chroot(void) {
 
    return 0;
 }
-
 
 static int drop_privs(void) {
    struct group *gr;
