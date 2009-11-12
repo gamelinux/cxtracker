@@ -142,7 +142,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
       ip6 = (ip6_header *) (packet + eth_header_len);
       if ( ip6->next == IP_PROTO_TCP ) {
          tcp_header *tcph;
-         tcph = (tcp_header *) (packet + eth_header_len + ip6->len);
+         tcph = (tcp_header *) (packet + eth_header_len + IP6_HEADER_LEN);
          /* printf("[*] IPv6 PROTOCOL TYPE TCP:\n"); */
          cx_track(ip6->ip_src, tcph->src_port, ip6->ip_dst, tcph->dst_port, ip6->next, ip6->len, tcph->t_flags, tstamp, AF_INET6);
          inpacket = 0;
@@ -150,7 +150,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
       }
       else if (ip6->next == IP_PROTO_UDP) {
          udp_header *udph;
-         udph = (udp_header *) (packet + eth_header_len + ip6->len);
+         udph = (udp_header *) (packet + eth_header_len + IP6_HEADER_LEN);
          /* printf("[*] IPv6 PROTOCOL TYPE UDP:\n"); */
          cx_track(ip6->ip_src, udph->src_port, ip6->ip_dst, udph->dst_port, ip6->next, ip6->len, 0, tstamp, AF_INET6);
          inpacket = 0;
@@ -158,7 +158,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
       }
       else if (ip6->next == IP6_PROTO_ICMP) {
          icmp6_header *icmph;
-         icmph = (icmp6_header *) (packet + eth_header_len + ip6->len);
+         icmph = (icmp6_header *) (packet + eth_header_len + IP6_HEADER_LEN);
          /* printf("[*] IPv6 PROTOCOL TYPE ICMP\n"); */
          cx_track(ip6->ip_src, ip6->hop_lmt, ip6->ip_dst, ip6->hop_lmt, ip6->next, ip6->len, 0, tstamp, AF_INET6);
          inpacket = 0;
@@ -218,15 +218,40 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
             return;
          }
       } else {
-         if ( memcmp(&cxt->s_ip,&ip_src,16) && memcmp(&cxt->d_ip,&ip_dst,16)
-              && cxt->s_port == src_port && cxt->d_port == dst_port ) {
+//         if ( memcmp(&cxt->s_ip,&ip_src,16) && memcmp(&cxt->d_ip,&ip_dst,16)
+//              && cxt->s_port == src_port && cxt->d_port == dst_port ) {
+         if (  cxt->s_ip.s6_addr32[0] == ip_src.s6_addr32[0]
+            && cxt->s_ip.s6_addr32[1] == ip_src.s6_addr32[1]
+            && cxt->s_ip.s6_addr32[2] == ip_src.s6_addr32[2]
+            && cxt->s_ip.s6_addr32[3] == ip_src.s6_addr32[3]
+
+            && cxt->d_ip.s6_addr32[0] == ip_dst.s6_addr32[0]
+            && cxt->d_ip.s6_addr32[1] == ip_dst.s6_addr32[1]
+            && cxt->d_ip.s6_addr32[2] == ip_dst.s6_addr32[2]
+            && cxt->d_ip.s6_addr32[3] == ip_dst.s6_addr32[3]
+
+            && cxt->s_port == src_port && cxt->d_port == dst_port ) {
+
             cxt->s_tcpFlags    |= tcpflags;
             cxt->s_total_bytes += p_bytes;
             cxt->s_total_pkts  += 1;
             cxt->last_pkt_time  = tstamp;
             return;
-         } else if ( memcmp(&cxt->s_ip,&ip_dst,16) && memcmp(&cxt->d_ip,&ip_src,16)
-                     && cxt->d_port == src_port && cxt->s_port == dst_port ) {
+         }
+//         } else if ( memcmp(&cxt->s_ip,&ip_dst,16) && memcmp(&cxt->d_ip,&ip_src,16)
+//                     && cxt->d_port == src_port && cxt->s_port == dst_port ) {
+         else if (  cxt->s_ip.s6_addr32[0] == ip_dst.s6_addr32[0]
+                 && cxt->s_ip.s6_addr32[1] == ip_dst.s6_addr32[1]
+                 && cxt->s_ip.s6_addr32[2] == ip_dst.s6_addr32[2]
+                 && cxt->s_ip.s6_addr32[3] == ip_dst.s6_addr32[3]
+
+                 && cxt->d_ip.s6_addr32[0] == ip_src.s6_addr32[0]
+                 && cxt->d_ip.s6_addr32[1] == ip_src.s6_addr32[1]
+                 && cxt->d_ip.s6_addr32[2] == ip_src.s6_addr32[2]
+                 && cxt->d_ip.s6_addr32[3] == ip_src.s6_addr32[3]
+                 
+                 && cxt->d_port == src_port && cxt->s_port == dst_port ) {
+
             cxt->d_tcpFlags    |= tcpflags;
             cxt->d_total_bytes += p_bytes;
             cxt->d_total_pkts  += 1;
