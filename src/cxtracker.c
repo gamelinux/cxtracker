@@ -199,18 +199,18 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
 
    while ( cxt != NULL ) {
       if (af == AF_INET) {
-         if ( cxt->s_ip.s6_addr32[0] == ip_src.s6_addr32[0] && cxt->d_ip.s6_addr32[0] == ip_dst.s6_addr32[0]
-              && cxt->s_port == src_port && cxt->d_port == dst_port ) {
-//         if ( !memcmp(&cxt->s_ip,&ip_src,4) && !memcmp(&cxt->d_ip,&ip_dst,4) && cxt->s_port == src_port && cxt->d_port == dst_port ) {
+//         if ( cxt->s_ip.s6_addr32[0] == ip_src.s6_addr32[0] && cxt->d_ip.s6_addr32[0] == ip_dst.s6_addr32[0]
+//              && cxt->s_port == src_port && cxt->d_port == dst_port ) {
+         if ( !memcmp(&cxt->s_ip,&ip_src,4) && !memcmp(&cxt->d_ip,&ip_dst,4) && cxt->s_port == src_port && cxt->d_port == dst_port ) {
             cxt->s_tcpFlags    |= tcpflags;
             cxt->s_total_bytes += p_bytes;
             cxt->s_total_pkts  += 1;
             cxt->last_pkt_time  = tstamp;
             return;
          }
-         else if ( cxt->s_ip.s6_addr32[0] == ip_dst.s6_addr32[0] && cxt->d_ip.s6_addr32[0] == ip_src.s6_addr32[0]
-                   && cxt->d_port == src_port && cxt->s_port == dst_port ) {
-//         else if ( !memcmp(&cxt->s_ip,&ip_dst,4) && !memcmp(&cxt->d_ip,&ip_src,4) && cxt->d_port == src_port && cxt->s_port == dst_port ) {
+//         else if ( cxt->s_ip.s6_addr32[0] == ip_dst.s6_addr32[0] && cxt->d_ip.s6_addr32[0] == ip_src.s6_addr32[0]
+//                   && cxt->d_port == src_port && cxt->s_port == dst_port ) {
+         else if ( !memcmp(&cxt->s_ip,&ip_dst,4) && !memcmp(&cxt->d_ip,&ip_src,4) && cxt->d_port == src_port && cxt->s_port == dst_port ) {
             cxt->d_tcpFlags    |= tcpflags;
             cxt->d_total_bytes += p_bytes;
             cxt->d_total_pkts  += 1;
@@ -218,9 +218,9 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
             return;
          }
       } else {
-//         if ( !memcmp(&cxt->s_ip,&ip_src,16) && !memcmp(&cxt->d_ip,&ip_dst,16)
-//              && cxt->s_port == src_port && cxt->d_port == dst_port ) {
-         if (  cxt->s_ip.s6_addr32[0] == ip_src.s6_addr32[0]
+         if ( !memcmp(&cxt->s_ip,&ip_src,16) && !memcmp(&cxt->d_ip,&ip_dst,16)
+              && cxt->s_port == src_port && cxt->d_port == dst_port ) {
+/*         if (  cxt->s_ip.s6_addr32[0] == ip_src.s6_addr32[0]
             && cxt->s_ip.s6_addr32[1] == ip_src.s6_addr32[1]
             && cxt->s_ip.s6_addr32[2] == ip_src.s6_addr32[2]
             && cxt->s_ip.s6_addr32[3] == ip_src.s6_addr32[3]
@@ -231,16 +231,16 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
             && cxt->d_ip.s6_addr32[3] == ip_dst.s6_addr32[3]
 
             && cxt->s_port == src_port && cxt->d_port == dst_port ) {
-
+*/
             cxt->s_tcpFlags    |= tcpflags;
             cxt->s_total_bytes += p_bytes;
             cxt->s_total_pkts  += 1;
             cxt->last_pkt_time  = tstamp;
             return;
          }
-//         } else if ( !memcmp(&cxt->s_ip,&ip_dst,16) && !memcmp(&cxt->d_ip,&ip_src,16)
-//                     && cxt->d_port == src_port && cxt->s_port == dst_port ) {
-         else if (  cxt->s_ip.s6_addr32[0] == ip_dst.s6_addr32[0]
+         else if ( !memcmp(&cxt->s_ip,&ip_dst,16) && !memcmp(&cxt->d_ip,&ip_src,16)
+                     && cxt->d_port == src_port && cxt->s_port == dst_port ) {
+/*         else if (  cxt->s_ip.s6_addr32[0] == ip_dst.s6_addr32[0]
                  && cxt->s_ip.s6_addr32[1] == ip_dst.s6_addr32[1]
                  && cxt->s_ip.s6_addr32[2] == ip_dst.s6_addr32[2]
                  && cxt->s_ip.s6_addr32[3] == ip_dst.s6_addr32[3]
@@ -251,7 +251,7 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
                  && cxt->d_ip.s6_addr32[3] == ip_src.s6_addr32[3]
                  
                  && cxt->d_port == src_port && cxt->s_port == dst_port ) {
-
+*/
             cxt->d_tcpFlags    |= tcpflags;
             cxt->d_total_bytes += p_bytes;
             cxt->d_total_pkts  += 1;
