@@ -54,7 +54,7 @@ static int   verbose, inpacket, intr_flag, use_syslog;
 
 /*  I N T E R N A L   P R O T O T Y P E S  ************************************/
 void move_connection (connection*, connection**);
-void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,uint16_t dst_port,uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af);
+inline void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,uint16_t dst_port,uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af);
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet);
 void end_sessions();
 void cxtbuffer_write();
@@ -179,6 +179,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
    /* } */
 }
 
+inline
 void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,uint16_t dst_port,
                uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af) {
 
@@ -263,7 +264,6 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
    }
 
    if ( cxt == NULL ) {
-      u_int64_t cxtrackerid;
       cxtrackerid += 1;
       cxt = (connection*) calloc(1, sizeof(connection));
       if (head != NULL ) {

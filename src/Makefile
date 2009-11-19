@@ -5,8 +5,8 @@ DCFLAGS=-g
 PCFLAGS=-g -pg
 LDFLAGS=-lpcap
 
-all: cxtracker
-#gcc -o cxtracker cxtracker.c -lpcap $(OCFLAGS)
+all:
+	gcc $(OCFLAGS) -o cxtracker cxtracker.c -lpcap
 
 debug: 
 	gcc $(DCFLAGS) -o cxtracker cxtracker.c -lpcap
