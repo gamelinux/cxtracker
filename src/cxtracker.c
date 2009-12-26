@@ -340,13 +340,15 @@ void end_sessions() {
               xpir = 1;
            }
            /* if not a complete TCP 3-way handshake */
-           else if ( !cxt->s_tcpFlags&TF_SYNACK || !cxt->d_tcpFlags&TF_SYNACK && (check_time - cxt->last_pkt_time) > 10) {
+           else if ( (!cxt->s_tcpFlags&TF_SYN && !cxt->s_tcpFlags&TF_ACK)
+                   ||(!cxt->d_tcpFlags&TF_SYN && !cxt->d_tcpFlags&TF_ACK)
+                   &&(check_time - cxt->last_pkt_time) > 30) {
               xpir = 1;
            }
            /* Ongoing timout */
-           else if ( (cxt->s_tcpFlags&TF_SYNACK || cxt->d_tcpFlags&TF_SYNACK) && ((check_time - cxt->last_pkt_time) > 120)) {
-              xpir = 1;
-           }
+           //else if ( (cxt->s_tcpFlags&TF_SYNACK || cxt->d_tcpFlags&TF_SYNACK) && ((check_time - cxt->last_pkt_time) > 120)) {
+           //   xpir = 1;
+           //}
            else if ( (check_time - cxt->last_pkt_time) > 600 ) {
               xpir = 1;
            }
