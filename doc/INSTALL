@@ -17,3 +17,11 @@ $ sudo cxtracker -h
 $ cp cxtracker /usr/local/sbin/
 
 
+# cxtracker2db.pl - for storing session data to a DB
+# Edit cxtracker2db.pl to match db user and password if needed.
+
+# Some files and dirs that should be writeable:
+mkdir /var/run/
+touch /var/log/cxtracker2db.log
+
+
