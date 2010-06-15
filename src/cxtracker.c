@@ -200,8 +200,9 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
 
    while ( cxt != NULL ) {
       if (af == AF_INET) {
-         if ( cxt->s_ip.s6_addr32[0] == ip_src.s6_addr32[0] && cxt->d_ip.s6_addr32[0] == ip_dst.s6_addr32[0]
-              && cxt->s_port == src_port && cxt->d_port == dst_port ) {
+         if ( cxt->s_port == src_port && cxt->d_port == dst_port
+              && cxt->s_ip.s6_addr32[0] == ip_src.s6_addr32[0] 
+              && cxt->d_ip.s6_addr32[0] == ip_dst.s6_addr32[0] ) {
 //         if ( !memcmp(&cxt->s_ip,&ip_src,4) && !memcmp(&cxt->d_ip,&ip_dst,4) && cxt->s_port == src_port && cxt->d_port == dst_port ) {
             cxt->s_tcpFlags    |= tcpflags;
             cxt->s_total_bytes += p_bytes;
@@ -209,8 +210,9 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
             cxt->last_pkt_time  = tstamp;
             return;
          }
-         else if ( cxt->s_ip.s6_addr32[0] == ip_dst.s6_addr32[0] && cxt->d_ip.s6_addr32[0] == ip_src.s6_addr32[0]
-                   && cxt->d_port == src_port && cxt->s_port == dst_port ) {
+         else if ( cxt->d_port == src_port && cxt->s_port == dst_port
+                   && cxt->s_ip.s6_addr32[0] == ip_dst.s6_addr32[0]
+                   && cxt->d_ip.s6_addr32[0] == ip_src.s6_addr32[0] ) {
 //         else if ( !memcmp(&cxt->s_ip,&ip_dst,4) && !memcmp(&cxt->d_ip,&ip_src,4) && cxt->d_port == src_port && cxt->s_port == dst_port ) {
             cxt->d_tcpFlags    |= tcpflags;
             cxt->d_total_bytes += p_bytes;
@@ -219,19 +221,18 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
             return;
          }
       } else {
-         if ( !memcmp(&cxt->s_ip,&ip_src,16) && !memcmp(&cxt->d_ip,&ip_dst,16)
-              && cxt->s_port == src_port && cxt->d_port == dst_port ) {
-/*         if (  cxt->s_ip.s6_addr32[0] == ip_src.s6_addr32[0]
-            && cxt->s_ip.s6_addr32[1] == ip_src.s6_addr32[1]
-            && cxt->s_ip.s6_addr32[2] == ip_src.s6_addr32[2]
+         if ( cxt->s_port == src_port && cxt->d_port == dst_port
+              && !memcmp(&cxt->s_ip,&ip_src,16) && !memcmp(&cxt->d_ip,&ip_dst,16) ) {
+/*         if ( cxt->s_port == src_port && cxt->d_port == dst_port
             && cxt->s_ip.s6_addr32[3] == ip_src.s6_addr32[3]
+            && cxt->s_ip.s6_addr32[2] == ip_src.s6_addr32[2]
+            && cxt->s_ip.s6_addr32[1] == ip_src.s6_addr32[1]
+            && cxt->s_ip.s6_addr32[0] == ip_src.s6_addr32[0]
 
-            && cxt->d_ip.s6_addr32[0] == ip_dst.s6_addr32[0]
-            && cxt->d_ip.s6_addr32[1] == ip_dst.s6_addr32[1]
-            && cxt->d_ip.s6_addr32[2] == ip_dst.s6_addr32[2]
             && cxt->d_ip.s6_addr32[3] == ip_dst.s6_addr32[3]
-
-            && cxt->s_port == src_port && cxt->d_port == dst_port ) {
+            && cxt->d_ip.s6_addr32[2] == ip_dst.s6_addr32[2]
+            && cxt->d_ip.s6_addr32[1] == ip_dst.s6_addr32[1]
+            && cxt->d_ip.s6_addr32[0] == ip_dst.s6_addr32[0] ) {
 */
             cxt->s_tcpFlags    |= tcpflags;
             cxt->s_total_bytes += p_bytes;
@@ -241,17 +242,16 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
          }
          else if ( !memcmp(&cxt->s_ip,&ip_dst,16) && !memcmp(&cxt->d_ip,&ip_src,16)
                      && cxt->d_port == src_port && cxt->s_port == dst_port ) {
-/*         else if (  cxt->s_ip.s6_addr32[0] == ip_dst.s6_addr32[0]
-                 && cxt->s_ip.s6_addr32[1] == ip_dst.s6_addr32[1]
-                 && cxt->s_ip.s6_addr32[2] == ip_dst.s6_addr32[2]
+/*         else if ( cxt->d_port == src_port && cxt->s_port == dst_port 
                  && cxt->s_ip.s6_addr32[3] == ip_dst.s6_addr32[3]
+                 && cxt->s_ip.s6_addr32[2] == ip_dst.s6_addr32[2]
+                 && cxt->s_ip.s6_addr32[1] == ip_dst.s6_addr32[1]
+                 && cxt->s_ip.s6_addr32[0] == ip_dst.s6_addr32[0]
 
-                 && cxt->d_ip.s6_addr32[0] == ip_src.s6_addr32[0]
-                 && cxt->d_ip.s6_addr32[1] == ip_src.s6_addr32[1]
-                 && cxt->d_ip.s6_addr32[2] == ip_src.s6_addr32[2]
                  && cxt->d_ip.s6_addr32[3] == ip_src.s6_addr32[3]
-                 
-                 && cxt->d_port == src_port && cxt->s_port == dst_port ) {
+                 && cxt->d_ip.s6_addr32[2] == ip_src.s6_addr32[2]
+                 && cxt->d_ip.s6_addr32[1] == ip_src.s6_addr32[1]
+                 && cxt->d_ip.s6_addr32[0] == ip_src.s6_addr32[0] ) {
 */
             cxt->d_tcpFlags    |= tcpflags;
             cxt->d_total_bytes += p_bytes;
@@ -298,7 +298,7 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
       cxt->d_port         = dst_port;
       cxt->proto          = ip_proto;
       cxt->next           = head;
-      cxt->prev           = NULL;
+      //cxt->prev           = NULL;
 
       /* New connections are pushed on to the head of bucket[s_hash] */
       bucket[hash] = cxt;
