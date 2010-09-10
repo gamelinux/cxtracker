@@ -1,0 +1,26 @@
+#!/bin/bash 
+
+set -e
+
+if ! getent passwd nsm >/dev/null; then
+       adduser --quiet --system --group --no-create-home --home /nsm_data/ --shell /usr/sbin/nologin nsm
+fi
+
+
+HOSTNAME=`hostname -s`
+NSM_DIR=/nsm_data
+SENSOR_DIR=$NSM_DIR/$HOSTNAME/cxtracker
+
+if [ ! -d $SENSOR_DIR ]; then
+	
+	mkdir -vp $SENSOR_DIR || exit 74
+	chown -vR nsm:nsm $NSM_DIR || exit 74
+
+else
+
+	echo "Can't create folder in $NSM_DIR. Please inspect."
+#	exit 77
+
+fi
+
+#update-rc.d cxtracker defaults

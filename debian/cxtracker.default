@@ -1,0 +1,5 @@
+# Set main configuration options here
+CXT_ARCHIVE_DIR="/nsm_data/`hostname -s`/cxtracker"
+CXT_INTERFACE="-i eth0"
+CXT_USER="-u nsm"
+CXT_GROUP="-g nsm"

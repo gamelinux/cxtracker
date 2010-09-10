@@ -1,0 +1,11 @@
+Document: cxtracker
+Title: Debian cxtracker Manual
+Author: Edward Fjellskaal <edward.fjellskaal@gmail.com>
+Abstract: This manual describes what cxtracker is
+ and how it can be used to
+ manage online manuals on Debian systems.
+Section: net
+
+Format: text
+Files: /usr/share/doc/cxtracker/cxtracker.text.gz
+

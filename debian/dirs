@@ -1,0 +1,8 @@
+etc/default
+usr/bin
+usr/sbin
+usr/share
+usr/share/doc
+usr/share/doc/cxtracker
+var/lock/subsys
+nsm_data/

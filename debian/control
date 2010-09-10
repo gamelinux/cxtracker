@@ -1,0 +1,15 @@
+Source: cxtracker
+Section: net
+Priority: optional
+Maintainer: Edward Bjarte Fjellskål <edward.fjellskaal@gmail.com>
+Build-Depends: debhelper (>= 7), libpcap0.8-dev
+Standards-Version: 3.8.3
+Homepage: http://github.com/gamelinux/cxtracker/
+
+Package: cxtracker
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, lsb-base (>= 3.0-6), adduser
+Homepage: http://www.gamelinux.org/
+Description: Connection Tracker is a passive network connection tracker.
+ Connection Tracker is a passive network connection tracker
+ for profiling, history, auditing and network discovery.
