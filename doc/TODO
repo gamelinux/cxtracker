@@ -3,11 +3,19 @@
 Before version 1.0
  * Config file and parsing
  * #ifdef debug
- * init script
+V* init script
  * Optimize as much as possible
- * debian package
+V* debian package
  * rpm for RHEL/CentOS 5.x
 
- * Maybe pcap stats, like dropped packets?
+V* Maybe pcap stats, like dropped packets?
+
+
+Befor Version 2.0
+ * PCAP capture of network traffic
+ * Indexing of PCAPS
+ * Limiting packet capture on bytes or packets 
+   in a connection if one wants.
+ 
 
 
