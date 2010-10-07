@@ -784,6 +784,8 @@ static void usage() {
     printf(" -g             : group\n");
     printf(" -D             : enables daemon mode\n");
     printf(" -T             : dir to chroot into\n");
+    printf(" -p             : pidfile\n");
+    printf(" -P             : path to pidfile\n"); 
     printf(" -h             : this help message\n");
     printf(" -v             : verbose\n\n");
 }
