@@ -1,4 +1,10 @@
-cxtracker (0.9.5-1) lucid; urgency=low
+cxtracker (0.9.5-2ubuntu1) lucid; urgency=low
+
+  * Added patch from kacper that fixes init-script
+
+ -- Edward Fjellskål <edward.fjellskaal@gmail.com>  Wed, 28 Oct 2010 00:44:12 +0200
+
+cxtracker (0.9.5-1ubuntu1) lucid; urgency=low
 
   * Initial release
 
