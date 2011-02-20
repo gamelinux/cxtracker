@@ -66,7 +66,8 @@ void set_end_sessions();
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet) {
    if ( intr_flag != 0 ) { check_interupt(); }
    inpacket = 1;
-   tstamp = time(NULL);
+   //tstamp = time(NULL);
+   tstamp = pheader->ts.tv_sec;
    u_short p_bytes;
 
    /* printf("[*] Got network packet...\n"); */
@@ -786,6 +787,7 @@ static void usage() {
     printf(" -T             : dir to chroot into\n");
     printf(" -p             : pidfile\n");
     printf(" -P             : path to pidfile\n"); 
+    printf(" -r             : pcap file to read\n");
     printf(" -h             : this help message\n");
     printf(" -v             : verbose\n\n");
 }
@@ -798,6 +800,7 @@ int main(int argc, char *argv[]) {
    struct bpf_program cfilter;
    char *bpff, errbuf[PCAP_ERRBUF_SIZE], *user_filter;
    char *net_ip_string;
+   const char *pcap_file = NULL;
    bpf_u_int32 net_mask;
    ch = fromfile = setfilter = version = drop_privs_flag = daemon_flag = 0;
    dev = "eth0";
@@ -815,7 +818,7 @@ int main(int argc, char *argv[]) {
    signal(SIGHUP,  dump_active);
    signal(SIGALRM, set_end_sessions); 
 
-   while ((ch = getopt(argc, argv, "b:d:DT:g:hi:p:P:u:v")) != -1)
+   while ((ch = getopt(argc, argv, "b:d:DT:g:hi:p:P:r:u:v")) != -1)
    switch (ch) {
       case 'i':
          dev = strdup(optarg);
@@ -853,54 +856,76 @@ int main(int argc, char *argv[]) {
       case 'P':
          pidpath = strdup(optarg);
          break;
+      case 'r':
+         pcap_file = strdup(optarg);
+         break;
       default:
          exit(1);
          break;
    }
 
-   if (getuid()) {
-      printf("[*] You must be root..\n");
-      return (1);
-   }
-
-   printf("[*] Running cxtracker %s\n",VERSION);
-
    errbuf[0] = '\0';
-   /* look up an availible device if non specified */
-   if (dev == 0x0) dev = pcap_lookupdev(errbuf);
-   printf("[*] Device: %s\n", dev);
+   if (pcap_file) {
+      /* Read from PCAP file specified by '-r' switch. */
+      printf("[*] Reading from file %s", pcap_file);
+      if (!(handle = pcap_open_offline(pcap_file, errbuf))) {
+         printf("\n");
+         printf("[*] Unable to open %s. (%s)", pcap_file, errbuf);
+      } else {
+         printf(" - OK\n");
+      }
 
-   if ((handle = pcap_open_live(dev, SNAPLENGTH, 1, 500, errbuf)) == NULL) {
-      printf("[*] Error pcap_open_live: %s \n", errbuf);
-      pcap_close(handle);
-      exit(1);
+   } else {
+
+      if (getuid()) {
+         printf("[*] You must be root..\n");
+         return (1);
+      }
+   
+      printf("[*] Running cxtracker %s\n",VERSION);
+   
+      //errbuf[0] = '\0';
+      /* look up an availible device if non specified */
+      if (dev == 0x0) dev = pcap_lookupdev(errbuf);
+      printf("[*] Device: %s\n", dev);
+   
+      if ((handle = pcap_open_live(dev, SNAPLENGTH, 1, 500, errbuf)) == NULL) {
+         printf("[*] Error pcap_open_live: %s \n", errbuf);
+         pcap_close(handle);
+         exit(1);
+      }
+
+      if ( chroot_flag == 1 ) {
+         set_chroot();
+      }
+
+      if(daemon_flag) {
+         if(!is_valid_path(pidpath))
+            printf("[*] PID path \"%s\" is bad, check privilege.",pidpath);
+            openlog("cxtracker", LOG_PID | LOG_CONS, LOG_DAEMON);
+            printf("[*] Daemonizing...\n\n");
+            go_daemon();
+      }
+
    }
-   else if ((pcap_compile(handle, &cfilter, bpff, 1 ,net_mask)) == -1) {
+
+   if ((pcap_compile(handle, &cfilter, bpff, 1 ,net_mask)) == -1) {
       printf("[*] Error pcap_compile user_filter: %s\n", pcap_geterr(handle));
       pcap_close(handle);
       exit(1);
    }
 
-   pcap_setfilter(handle, &cfilter);
-   pcap_freecode(&cfilter); // filter code not needed after setfilter
+   if (pcap_setfilter(handle, &cfilter)) {
+      printf("[*] Unable to set pcap filter!  (%s)\n", pcap_geterr(handle));
+   } else {
+      pcap_freecode(&cfilter); // filter code not needed after setfilter
+   }
 
    /* B0rk if we see an error... */
    if (strlen(errbuf) > 0) {
       printf("[*] Error errbuf: %s \n", errbuf);
       pcap_close(handle);
       exit(1);
-   }
-
-   if ( chroot_flag == 1 ) {
-      set_chroot();
-   }
-
-   if(daemon_flag) {
-      if(!is_valid_path(pidpath))
-         printf("[*] PID path \"%s\" is bad, check privilege.",pidpath);
-         openlog("cxtracker", LOG_PID | LOG_CONS, LOG_DAEMON);
-         printf("[*] Daemonizing...\n\n");
-         go_daemon();
    }
 
    if(drop_privs_flag) {
@@ -910,9 +935,13 @@ int main(int argc, char *argv[]) {
    bucket_keys_NULL();
 
    alarm(TIMEOUT);
-   printf("[*] Sniffing...\n\n");
+   if (pcap_file) { 
+      printf("[*] Reading packets...\n\n");
+   } else {
+      printf("[*] Sniffing...\n\n");
+   }
    pcap_loop(handle,-1,got_packet,NULL);
 
-   pcap_close(handle);
+   game_over();
    return(0);
 }
