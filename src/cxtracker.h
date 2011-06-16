@@ -28,6 +28,9 @@
 #define BUCKET_SIZE                   1211
 #define SNAPLENGTH                    1600
 
+#define MODE_DEV                      0x01
+#define MODE_FILE                     0x02
+
 #define ETHERNET_TYPE_IP              0x0800
 #define ETHERNET_TYPE_ARP             0x0806
 #define ETHERNET_TYPE_IPV6            0x86dd
@@ -311,6 +314,7 @@ typedef struct _connection {
         u_int64_t  d_total_bytes;       /* total destination bytes */
         u_int8_t   s_tcpFlags;          /* tcpflags sent by source */
         u_int8_t   d_tcpFlags;          /* tcpflags sent by destination */
+        int64_t    start_offset;        /* byte offset of the starting packet */
         time_t     start_time;          /* connection start time */
         time_t     last_pkt_time;       /* last seen packet time */
         struct _connection *prev;       /* Pointer to prev connection */

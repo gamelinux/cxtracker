@@ -51,6 +51,8 @@ static char  *group_name, *user_name, *true_pid_name;
 static char  *pidfile = "cxtracker.pid";
 static char  *pidpath = "/var/run";
 static int   verbose, inpacket, intr_flag, use_syslog;
+static int   mode;
+
 
 /*  I N T E R N A L   P R O T O T Y P E S  ************************************/
 void move_connection (connection*, connection**);
@@ -280,6 +282,12 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
       /* cxt->d_total_bytes  = 0; */
       /* cxt->d_total_pkts   = 0; */
       cxt->start_time     = tstamp;
+
+      if ( mode & MODE_FILE )
+         cxt->start_offset = (int64_t)ftell(pcap_file(handle));
+      else
+         cxt->start_offset = -1;
+
       cxt->last_pkt_time  = tstamp;
 
       cxt->s_ip          = ip_src;
@@ -468,11 +476,10 @@ void cxtbuffer_write () {
                                                          cxtbuffer->proto,s_ip_t,ntohs(cxtbuffer->s_port));
             fprintf(cxtFile,"%u|%u|%ju|%ju|",d_ip_t,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,
                                              cxtbuffer->s_total_bytes);
-            fprintf(cxtFile,"%ju|%ju|%u|%u\n",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
+            fprintf(cxtFile,"%ju|%ju|%u|%u",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
                                               cxtbuffer->d_tcpFlags);
          }
-
-         if ( cxtbuffer->ipversion == AF_INET6 ) {
+         else if ( cxtbuffer->ipversion == AF_INET6 ) {
             if ( verbose != 1 ) {
                if (!inet_ntop(AF_INET6, &cxtbuffer->s_ip, src_s, INET6_ADDRSTRLEN + 1 ))
                   perror("Something died in inet_ntop");
@@ -483,9 +490,15 @@ void cxtbuffer_write () {
                                                          cxtbuffer->proto,src_s,ntohs(cxtbuffer->s_port));
             fprintf(cxtFile,"%s|%u|%ju|%ju|",dst_s,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,
                                              cxtbuffer->s_total_bytes);
-            fprintf(cxtFile,"%ju|%ju|%u|%u\n",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
+            fprintf(cxtFile,"%ju|%ju|%u|%u",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
                                               cxtbuffer->d_tcpFlags);
          }
+
+         /* print the byte offset if reading from a file */
+         if ( mode & MODE_FILE )
+            fprintf(cxtFile, "|%lld", cxtbuffer->start_offset);
+
+         fprintf(cxtFile, "\n");
 
          next = cxtbuffer->next;
          free(cxtbuffer);
@@ -801,6 +814,7 @@ int main(int argc, char *argv[]) {
    char *bpff, errbuf[PCAP_ERRBUF_SIZE], *user_filter;
    char *net_ip_string;
    const char *pcap_file = NULL;
+
    bpf_u_int32 net_mask;
    ch = fromfile = setfilter = version = drop_privs_flag = daemon_flag = 0;
    dev = "eth0";
@@ -811,6 +825,7 @@ int main(int argc, char *argv[]) {
    cxtrackerid  = 0;
    inpacket = intr_flag = chroot_flag = 0;
    timecnt = time(NULL);
+   mode = 0;
 
    signal(SIGTERM, game_over);
    signal(SIGINT,  game_over);
@@ -822,6 +837,7 @@ int main(int argc, char *argv[]) {
    switch (ch) {
       case 'i':
          dev = strdup(optarg);
+         mode |= MODE_DEV;
          break;
       case 'b':
          bpff = strdup(optarg);
@@ -858,6 +874,7 @@ int main(int argc, char *argv[]) {
          break;
       case 'r':
          pcap_file = strdup(optarg);
+         mode |= MODE_FILE;
          break;
       default:
          exit(1);
@@ -865,7 +882,14 @@ int main(int argc, char *argv[]) {
    }
 
    errbuf[0] = '\0';
-   if (pcap_file) {
+
+   // specify reading from a device OR a file and not both
+   if ( (mode & MODE_DEV) && (mode & MODE_FILE) )
+   {
+      printf("[*] You must specify a device OR file to read from, not both.\n");
+      exit(1);
+   }
+   else if ( (mode & MODE_FILE) && pcap_file) {
       /* Read from PCAP file specified by '-r' switch. */
       printf("[*] Reading from file %s", pcap_file);
       if (!(handle = pcap_open_offline(pcap_file, errbuf))) {
@@ -875,11 +899,11 @@ int main(int argc, char *argv[]) {
          printf(" - OK\n");
       }
 
-   } else {
-
+   }
+   else if ( (mode & MODE_DEV) && dev) {
       if (getuid()) {
          printf("[*] You must be root..\n");
-         return (1);
+         exit(1);
       }
 
       printf("[*] Running cxtracker %s\n",VERSION);
@@ -906,7 +930,11 @@ int main(int argc, char *argv[]) {
             printf("[*] Daemonizing...\n\n");
             go_daemon();
       }
-
+   }
+   else
+   {
+      printf("[*] You must specify where to read from.\n");
+      exit(1);
    }
 
    if ((pcap_compile(handle, &cfilter, bpff, 1 ,net_mask)) == -1) {
