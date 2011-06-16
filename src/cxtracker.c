@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <netinet/in.h> 
+#include <netinet/in.h>
 #include <signal.h>
 #include <pcap.h>
 #include <getopt.h>
@@ -80,7 +80,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
 
    if ( eth_type == ETHERNET_TYPE_8021Q ) {
       /* printf("[*] ETHERNET TYPE 8021Q\n"); */
-      eth_type = ntohs(eth_hdr->eth_8_ip_type); 
+      eth_type = ntohs(eth_hdr->eth_8_ip_type);
       eth_header_len +=4;
    }
 
@@ -202,7 +202,7 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
    while ( cxt != NULL ) {
       if (af == AF_INET) {
          if ( cxt->s_port == src_port && cxt->d_port == dst_port
-              && cxt->s_ip.s6_addr32[0] == ip_src.s6_addr32[0] 
+              && cxt->s_ip.s6_addr32[0] == ip_src.s6_addr32[0]
               && cxt->d_ip.s6_addr32[0] == ip_dst.s6_addr32[0] ) {
 //         if ( !memcmp(&cxt->s_ip,&ip_src,4) && !memcmp(&cxt->d_ip,&ip_dst,4) && cxt->s_port == src_port && cxt->d_port == dst_port ) {
             cxt->s_tcpFlags    |= tcpflags;
@@ -243,7 +243,7 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
          }
          else if ( !memcmp(&cxt->s_ip,&ip_dst,16) && !memcmp(&cxt->d_ip,&ip_src,16)
                      && cxt->d_port == src_port && cxt->s_port == dst_port ) {
-/*         else if ( cxt->d_port == src_port && cxt->s_port == dst_port 
+/*         else if ( cxt->d_port == src_port && cxt->s_port == dst_port
                  && cxt->s_ip.s6_addr32[3] == ip_dst.s6_addr32[3]
                  && cxt->s_ip.s6_addr32[2] == ip_dst.s6_addr32[2]
                  && cxt->s_ip.s6_addr32[1] == ip_dst.s6_addr32[1]
@@ -286,14 +286,14 @@ void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,ui
       cxt->d_ip          = ip_dst;
       /* This should be Zeroed due to calloc */
       /*
-      if (af == AF_INET) { 
-         cxt->s_ip.s6_addr32[1]          = 0; 
-         cxt->s_ip.s6_addr32[2]          = 0; 
-         cxt->s_ip.s6_addr32[3]          = 0; 
-         cxt->d_ip.s6_addr32[1]          = 0; 
-         cxt->d_ip.s6_addr32[2]          = 0; 
-         cxt->d_ip.s6_addr32[3]          = 0; 
-      } 
+      if (af == AF_INET) {
+         cxt->s_ip.s6_addr32[1]          = 0;
+         cxt->s_ip.s6_addr32[2]          = 0;
+         cxt->s_ip.s6_addr32[3]          = 0;
+         cxt->d_ip.s6_addr32[1]          = 0;
+         cxt->d_ip.s6_addr32[2]          = 0;
+         cxt->d_ip.s6_addr32[3]          = 0;
+      }
       */
       cxt->s_port         = src_port;
       cxt->d_port         = dst_port;
@@ -324,7 +324,7 @@ void end_sessions() {
    uint32_t curcxt  = 0;
    uint32_t expired = 0;
    cxtbuffer = NULL;
-   
+
    for ( cxkey = 0; cxkey < BUCKET_SIZE; cxkey++ ) {
       cxt = bucket[cxkey];
       xpir = 0;
@@ -402,7 +402,7 @@ void move_connection (connection *cxt_from, connection **bucket_ptr_from) {
       next->prev = prev;
    }
 
-   /* add cxt to expired list cxtbuffer 
+   /* add cxt to expired list cxtbuffer
     * - if head is null -> head = cxt;
     */
    cxt_from->next = cxtbuffer; /* next = head */
@@ -432,7 +432,7 @@ void cxtbuffer_write () {
       printf("[*] ERROR: Cant open file %s\n",cxtfname);
    }
    else {
-      
+
       while ( cxtbuffer != NULL ) {
 
          tot_time = cxtbuffer->last_pkt_time - cxtbuffer->start_time;
@@ -508,7 +508,7 @@ void end_all_sessions() {
       while ( cxt != NULL ) {
          expired++;
          connection *tmp = cxt;
-         cxt = cxt->next;           
+         cxt = cxt->next;
          move_connection(tmp, &bucket[cxkey]);
          if ( cxt == NULL ) {
             bucket[cxkey] = NULL;
@@ -575,7 +575,7 @@ static int set_chroot(void) {
    char *absdir;
    char *logdir;
    int abslen;
-   
+
    /* logdir = get_abs_path(logpath); */
 
    /* change to the directory */
@@ -586,7 +586,7 @@ static int set_chroot(void) {
    /* always returns an absolute pathname */
    absdir = getcwd(NULL, 0);
    abslen = strlen(absdir);
-   
+
    /* make the chroot call */
    if ( chroot(absdir) < 0 ) {
       printf("Can not chroot to \"%s\": absolute: %s: %s\n",chroot_dir,absdir,strerror(errno));
@@ -594,7 +594,7 @@ static int set_chroot(void) {
 
    if ( chdir("/") < 0 ) {
         printf("Can not chdir to \"/\" after chroot: %s\n",strerror(errno));
-   }   
+   }
 
    return 0;
 }
@@ -617,9 +617,9 @@ static int drop_privs(void) {
       }
       else {
          groupid = strtoul(group_name, &endptr, 10);
-      }        
+      }
    }
-    
+
    if ( user_name != NULL ) {
       do_setuid = 1;
       do_setgid = 1;
@@ -630,7 +630,7 @@ static int drop_privs(void) {
          userid = strtoul(user_name, &endptr, 10);
          pw = getpwuid(userid);
       }
-        
+
       if ( group_name == NULL ) {
          groupid = pw->pw_gid;
       }
@@ -641,10 +641,10 @@ static int drop_privs(void) {
          printf("Unable to set group ID: %s", strerror(i));
       }
    }
-    
+
    endgrent();
    endpwent();
-    
+
    if ( do_setuid ) {
       if (getuid() == 0 && initgroups(user_name, groupid) < 0 ) {
          printf("Unable to init group names (%s/%lu)", user_name, groupid);
@@ -702,9 +702,9 @@ static int create_pid_file(char *path, char *filename) {
    else {
       printf("PID path \"%s\" isn't a writeable directory!", fp);
    }
-   
+
    true_pid_name = strdup(filename);
-   
+
    if ( (fd = open(filepath, O_CREAT | O_WRONLY,
                     S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1 ) {
       return ERROR;
@@ -786,7 +786,7 @@ static void usage() {
     printf(" -D             : enables daemon mode\n");
     printf(" -T             : dir to chroot into\n");
     printf(" -p             : pidfile\n");
-    printf(" -P             : path to pidfile\n"); 
+    printf(" -P             : path to pidfile\n");
     printf(" -r             : pcap file to read\n");
     printf(" -h             : this help message\n");
     printf(" -v             : verbose\n\n");
@@ -816,7 +816,7 @@ int main(int argc, char *argv[]) {
    signal(SIGINT,  game_over);
    signal(SIGQUIT, game_over);
    signal(SIGHUP,  dump_active);
-   signal(SIGALRM, set_end_sessions); 
+   signal(SIGALRM, set_end_sessions);
 
    while ((ch = getopt(argc, argv, "b:d:DT:g:hi:p:P:r:u:v")) != -1)
    switch (ch) {
@@ -881,14 +881,14 @@ int main(int argc, char *argv[]) {
          printf("[*] You must be root..\n");
          return (1);
       }
-   
+
       printf("[*] Running cxtracker %s\n",VERSION);
-   
+
       //errbuf[0] = '\0';
       /* look up an availible device if non specified */
       if (dev == 0x0) dev = pcap_lookupdev(errbuf);
       printf("[*] Device: %s\n", dev);
-   
+
       if ((handle = pcap_open_live(dev, SNAPLENGTH, 1, 500, errbuf)) == NULL) {
          printf("[*] Error pcap_open_live: %s \n", errbuf);
          pcap_close(handle);
@@ -931,11 +931,11 @@ int main(int argc, char *argv[]) {
    if(drop_privs_flag) {
       printf("[*] Dropping privs...\n\n");
       drop_privs();
-   } 
+   }
    bucket_keys_NULL();
 
    alarm(TIMEOUT);
-   if (pcap_file) { 
+   if (pcap_file) {
       printf("[*] Reading packets...\n\n");
    } else {
       printf("[*] Sniffing...\n\n");
