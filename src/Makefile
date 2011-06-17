@@ -1,19 +1,33 @@
 #Makefile
+CC=gcc
 
-OCFLAGS=-O3
+OCFLAGS=-g -O3
 DCFLAGS=-g
 PCFLAGS=-g -pg
-LDFLAGS=-lpcap
+LIBS=-lpcap
+LDFLAGS=
 
-all:
-	gcc $(OCFLAGS) -o cxtracker cxtracker.c -lpcap
+SRC= cxtracker.c cxtracker.h \
+ip.c ip.h
 
-debug: 
-	gcc $(DCFLAGS) -o cxtracker cxtracker.c -lpcap
+OBJS= ip.o cxtracker.o
 
-profile:
-	gcc $(PCFLAGS) -o cxtracker cxtracker.c -lpcap
+TARGETS=cxtracker
+
+all:${TARGETS}
+
+cxtracker: $(OBJS)
+	$(CC) $(OBJS) -o cxtracker $(LIBS) $(LDFLAGS)
+
+debug: $(OBJS)
+	$(CC) $(OBJS) -o cxtracker $(DCFLAGS) $(LDFLAGS)
+
+profile: $(OBJS)
+	$(CC) $(OBJS) -o cxtracker $(RCFLAGS) $(LDFLAGS)
 
 clean:
-	-rm -v cxtracker smallcxt cxtracker.o
+	-rm -f ${OBJS} ${TARGETS}
+
+.c.o:
+	$(CC) -c -Wall $(DEFS) $(OCFLAGS) $<
 
