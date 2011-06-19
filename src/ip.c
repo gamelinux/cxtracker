@@ -262,9 +262,11 @@ int ip_ismapped(const ip_t *ip)
 
 void ip_obfuscate(ip_t *ob, const ip_t *ip)
 {
+/*
     unsigned int *ob_p, *ip_p;
     int index, i;
     unsigned int mask = 0;
+*/
 
     if(!ob || !ip)
         return;

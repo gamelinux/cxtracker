@@ -21,6 +21,7 @@
 */
 
 /*  I N C L U D E S  **********************************************************/
+#include "ip.h"
 
 /*  D E F I N E S  ************************************************************/
 #define VERSION                       "0.9.6"
@@ -304,8 +305,9 @@ typedef struct _connection {
         u_int64_t  cxid;                /* connection id */
         int        ipversion;           /* IP version (4/6) */
         u_int8_t   proto;               /* IP protocoll type */
-        struct     in6_addr s_ip;       /* source address */
-        struct     in6_addr d_ip;       /* destination address */
+        ip_t       s_ip;                /* source address */
+        ip_t       d_ip;                /* destination address */
+
         u_int16_t  s_port;              /* source port */
         u_int16_t  d_port;              /* destination port */
         u_int64_t  s_total_pkts;        /* total source packets */
