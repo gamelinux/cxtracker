@@ -38,6 +38,7 @@
 #include <syslog.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <ctype.h>
 #include "cxtracker.h"
 
 /*  G L O B A L E S  **********************************************************/
@@ -56,7 +57,7 @@ static int   mode;
 
 /*  I N T E R N A L   P R O T O T Y P E S  ************************************/
 void move_connection (connection*, connection**);
-inline void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,uint16_t dst_port,uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af);
+inline void cx_track(ip_t ip_src, uint16_t src_port, ip_t ip_dst, uint16_t dst_port,uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af);
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet);
 void end_sessions();
 void cxtbuffer_write();
@@ -92,20 +93,18 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
       eth_header_len +=8;
    }
 
+   /* zero-ise our structure, simplifies our hashing later on */
+   ip_t ip_src = { 0 };
+   ip_t ip_dst = { 0 };
+
    if ( eth_type == ETHERNET_TYPE_IP ) {
       /* printf("[*] Got IPv4 Packet...\n"); */
       ip4_header *ip4;
       ip4 = (ip4_header *) (packet + eth_header_len);
       p_bytes = (ip4->ip_len - (IP_HL(ip4)*4));
-      struct in6_addr ip_src, ip_dst;
-      ip_src.s6_addr32[0] = ip4->ip_src;
-      ip_src.s6_addr32[1] = 0;
-      ip_src.s6_addr32[2] = 0;
-      ip_src.s6_addr32[3] = 0;
-      ip_dst.s6_addr32[0] = ip4->ip_dst;
-      ip_dst.s6_addr32[1] = 0;
-      ip_dst.s6_addr32[2] = 0;
-      ip_dst.s6_addr32[3] = 0;
+
+      ip_set_raw(&ip_src, &ip4->ip_src, AF_INET);
+      ip_set_raw(&ip_dst, &ip4->ip_dst, AF_INET);
 
       if ( ip4->ip_p == IP_PROTO_TCP ) {
          tcp_header *tcph;
@@ -143,11 +142,15 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
       /* printf("[*] Got IPv6 Packet...\n"); */
       ip6_header *ip6;
       ip6 = (ip6_header *) (packet + eth_header_len);
+
+      ip_set_raw(&ip_src, &ip6->ip_src, AF_INET6);
+      ip_set_raw(&ip_dst, &ip6->ip_dst, AF_INET6);
+
       if ( ip6->next == IP_PROTO_TCP ) {
          tcp_header *tcph;
          tcph = (tcp_header *) (packet + eth_header_len + IP6_HEADER_LEN);
          /* printf("[*] IPv6 PROTOCOL TYPE TCP:\n"); */
-         cx_track(ip6->ip_src, tcph->src_port, ip6->ip_dst, tcph->dst_port, ip6->next, ip6->len, tcph->t_flags, tstamp, AF_INET6);
+         cx_track(ip_src, tcph->src_port, ip_dst, tcph->dst_port, ip6->next, ip6->len, tcph->t_flags, tstamp, AF_INET6);
          inpacket = 0;
          return;
       }
@@ -155,7 +158,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          udp_header *udph;
          udph = (udp_header *) (packet + eth_header_len + IP6_HEADER_LEN);
          /* printf("[*] IPv6 PROTOCOL TYPE UDP:\n"); */
-         cx_track(ip6->ip_src, udph->src_port, ip6->ip_dst, udph->dst_port, ip6->next, ip6->len, 0, tstamp, AF_INET6);
+         cx_track(ip_src, udph->src_port, ip_dst, udph->dst_port, ip6->next, ip6->len, 0, tstamp, AF_INET6);
          inpacket = 0;
          return;
       }
@@ -163,13 +166,13 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          icmp6_header *icmph;
          icmph = (icmp6_header *) (packet + eth_header_len + IP6_HEADER_LEN);
          /* printf("[*] IPv6 PROTOCOL TYPE ICMP\n"); */
-         cx_track(ip6->ip_src, ip6->hop_lmt, ip6->ip_dst, ip6->hop_lmt, ip6->next, ip6->len, 0, tstamp, AF_INET6);
+         cx_track(ip_src, ip6->hop_lmt, ip_dst, ip6->hop_lmt, ip6->next, ip6->len, 0, tstamp, AF_INET6);
          inpacket = 0;
          return;
       }
       else {
          /* printf("[*] IPv6 PROTOCOL TYPE OTHER: %d\n",ip6->next); */
-         cx_track(ip6->ip_src, ip6->next, ip6->ip_dst, ip6->next, ip6->next, ip6->len, 0, tstamp, AF_INET6);
+         cx_track(ip_src, ip6->next, ip_dst, ip6->next, ip6->next, ip6->len, 0, tstamp, AF_INET6);
          inpacket = 0;
          return;
       }
@@ -183,85 +186,41 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
 }
 
 inline
-void cx_track(struct in6_addr ip_src,uint16_t src_port,struct in6_addr ip_dst,uint16_t dst_port,
+void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
                uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af) {
 
    connection *cxt = NULL;
    connection *head = NULL;
-   uint64_t hash;
 
-   if (af == AF_INET) {
-      hash = (( ip_src.s6_addr32[0] + ip_dst.s6_addr32[0] )) % BUCKET_SIZE;
-   } else {
-      hash = ((  ip_src.s6_addr32[0] + ip_src.s6_addr32[1] + ip_src.s6_addr32[2] + ip_src.s6_addr32[3]
-               + ip_dst.s6_addr32[0] + ip_dst.s6_addr32[1] + ip_dst.s6_addr32[2] + ip_dst.s6_addr32[3]
-             ))  % BUCKET_SIZE;
-   }
+   /* for non-ipv6 addresses, indexes 1, 2 and 3 are zero and don't influence the hash */
+   uint64_t hash = ( ip_src.ip32[0] + ip_src.ip32[1] +
+                     ip_src.ip32[2] + ip_src.ip32[3] +
+                     ip_dst.ip32[0] + ip_dst.ip32[1] +
+                     ip_dst.ip32[2] + ip_dst.ip32[3] ) % BUCKET_SIZE;
 
    cxt = bucket[hash];
    head = cxt;
 
    while ( cxt != NULL ) {
-      if (af == AF_INET) {
-         if ( cxt->s_port == src_port && cxt->d_port == dst_port
-              && cxt->s_ip.s6_addr32[0] == ip_src.s6_addr32[0]
-              && cxt->d_ip.s6_addr32[0] == ip_dst.s6_addr32[0] ) {
-//         if ( !memcmp(&cxt->s_ip,&ip_src,4) && !memcmp(&cxt->d_ip,&ip_dst,4) && cxt->s_port == src_port && cxt->d_port == dst_port ) {
-            cxt->s_tcpFlags    |= tcpflags;
-            cxt->s_total_bytes += p_bytes;
-            cxt->s_total_pkts  += 1;
-            cxt->last_pkt_time  = tstamp;
-            return;
-         }
-         else if ( cxt->d_port == src_port && cxt->s_port == dst_port
-                   && cxt->s_ip.s6_addr32[0] == ip_dst.s6_addr32[0]
-                   && cxt->d_ip.s6_addr32[0] == ip_src.s6_addr32[0] ) {
-//         else if ( !memcmp(&cxt->s_ip,&ip_dst,4) && !memcmp(&cxt->d_ip,&ip_src,4) && cxt->d_port == src_port && cxt->s_port == dst_port ) {
-            cxt->d_tcpFlags    |= tcpflags;
-            cxt->d_total_bytes += p_bytes;
-            cxt->d_total_pkts  += 1;
-            cxt->last_pkt_time  = tstamp;
-            return;
-         }
-      } else {
-         if ( cxt->s_port == src_port && cxt->d_port == dst_port
-              && !memcmp(&cxt->s_ip,&ip_src,16) && !memcmp(&cxt->d_ip,&ip_dst,16) ) {
-/*         if ( cxt->s_port == src_port && cxt->d_port == dst_port
-            && cxt->s_ip.s6_addr32[3] == ip_src.s6_addr32[3]
-            && cxt->s_ip.s6_addr32[2] == ip_src.s6_addr32[2]
-            && cxt->s_ip.s6_addr32[1] == ip_src.s6_addr32[1]
-            && cxt->s_ip.s6_addr32[0] == ip_src.s6_addr32[0]
-
-            && cxt->d_ip.s6_addr32[3] == ip_dst.s6_addr32[3]
-            && cxt->d_ip.s6_addr32[2] == ip_dst.s6_addr32[2]
-            && cxt->d_ip.s6_addr32[1] == ip_dst.s6_addr32[1]
-            && cxt->d_ip.s6_addr32[0] == ip_dst.s6_addr32[0] ) {
-*/
-            cxt->s_tcpFlags    |= tcpflags;
-            cxt->s_total_bytes += p_bytes;
-            cxt->s_total_pkts  += 1;
-            cxt->last_pkt_time  = tstamp;
-            return;
-         }
-         else if ( !memcmp(&cxt->s_ip,&ip_dst,16) && !memcmp(&cxt->d_ip,&ip_src,16)
-                     && cxt->d_port == src_port && cxt->s_port == dst_port ) {
-/*         else if ( cxt->d_port == src_port && cxt->s_port == dst_port
-                 && cxt->s_ip.s6_addr32[3] == ip_dst.s6_addr32[3]
-                 && cxt->s_ip.s6_addr32[2] == ip_dst.s6_addr32[2]
-                 && cxt->s_ip.s6_addr32[1] == ip_dst.s6_addr32[1]
-                 && cxt->s_ip.s6_addr32[0] == ip_dst.s6_addr32[0]
-
-                 && cxt->d_ip.s6_addr32[3] == ip_src.s6_addr32[3]
-                 && cxt->d_ip.s6_addr32[2] == ip_src.s6_addr32[2]
-                 && cxt->d_ip.s6_addr32[1] == ip_src.s6_addr32[1]
-                 && cxt->d_ip.s6_addr32[0] == ip_src.s6_addr32[0] ) {
-*/
-            cxt->d_tcpFlags    |= tcpflags;
-            cxt->d_total_bytes += p_bytes;
-            cxt->d_total_pkts  += 1;
-            cxt->last_pkt_time  = tstamp;
-            return;
-         }
+      if ( cxt->s_port == src_port && cxt->d_port == dst_port
+           && ip_cmp(&cxt->s_ip, &ip_src) == 0
+           && ip_cmp(&cxt->d_ip, &ip_dst) == 0 )
+      {
+         cxt->s_tcpFlags    |= tcpflags;
+         cxt->s_total_bytes += p_bytes;
+         cxt->s_total_pkts  += 1;
+         cxt->last_pkt_time  = tstamp;
+         return;
+      }
+      else if ( cxt->d_port == src_port && cxt->s_port == dst_port
+                && ip_cmp(&cxt->s_ip, &ip_dst) == 0
+                && ip_cmp(&cxt->d_ip, &ip_src) == 0 )
+      {
+         cxt->d_tcpFlags    |= tcpflags;
+         cxt->d_total_bytes += p_bytes;
+         cxt->d_total_pkts  += 1;
+         cxt->last_pkt_time  = tstamp;
+         return;
       }
       cxt = cxt->next;
    }
@@ -349,9 +308,11 @@ void end_sessions() {
               xpir = 1;
            }
            /* if not a complete TCP 3-way handshake */
-           else if ( (!cxt->s_tcpFlags&TF_SYN && !cxt->s_tcpFlags&TF_ACK)
-                   ||(!cxt->d_tcpFlags&TF_SYN && !cxt->d_tcpFlags&TF_ACK)
-                   &&(check_time - cxt->last_pkt_time) > 30) {
+           else if ( ( ( !(cxt->s_tcpFlags&TF_SYN) ) && ( !(cxt->s_tcpFlags&TF_ACK) ) ) || (
+                       ( ( !(cxt->d_tcpFlags&TF_SYN) ) && ( !(cxt->d_tcpFlags&TF_ACK) ) ) &&
+                       ( (check_time-cxt->last_pkt_time) > 30)
+                     )
+                   ) {
               xpir = 1;
            }
            /* Ongoing timout */
@@ -379,7 +340,7 @@ void end_sessions() {
             xpir = 0;
             connection *tmp = cxt;
             if (cxt == cxt->next) {
-               cxt->next == NULL;
+               cxt->next = NULL;
             }
             cxt = cxt->next;
             move_connection(tmp, &bucket[cxkey]);
@@ -425,15 +386,13 @@ void cxtbuffer_write () {
    next = NULL;
    char stime[80], ltime[80];
    time_t tot_time;
-   static char src_s[INET6_ADDRSTRLEN];
-   static char dst_s[INET6_ADDRSTRLEN];
-   uint32_t s_ip_t, d_ip_t;
+   static char src_s[IP_ADDRMAX];
+   static char dst_s[IP_ADDRMAX];
 
    FILE *cxtFile;
-   char *cxtfname;
-   cxtfname = "";
+   char cxtfname[4096];
 
-   asprintf(&cxtfname, "%s/stats.%s.%ld", dpath, dev, tstamp);
+   sprintf(cxtfname, "%s/stats.%s.%ld", dpath, dev, tstamp);
    cxtFile = fopen(cxtfname, "w");
 
    if (cxtFile == NULL) {
@@ -447,20 +406,12 @@ void cxtbuffer_write () {
          strftime(stime, 80, "%F %H:%M:%S", gmtime(&cxtbuffer->start_time));
          strftime(ltime, 80, "%F %H:%M:%S", gmtime(&cxtbuffer->last_pkt_time));
 
-         if ( verbose == 1 ) {
-            if (cxtbuffer->ipversion == AF_INET) {
-               if (!inet_ntop(AF_INET, &cxtbuffer->s_ip.s6_addr32[0], src_s, INET_ADDRSTRLEN + 1 ))
-                  perror("Something died in inet_ntop");
-               if (!inet_ntop(AF_INET, &cxtbuffer->d_ip.s6_addr32[0], dst_s, INET_ADDRSTRLEN + 1 ))
-                  perror("Something died in inet_ntop");
-            }
-            else if (cxtbuffer->ipversion == AF_INET6) {
-               if (!inet_ntop(AF_INET6, &cxtbuffer->s_ip, src_s, INET6_ADDRSTRLEN + 1 ))
-                  perror("Something died in inet_ntop");
-               if (!inet_ntop(AF_INET6, &cxtbuffer->d_ip, dst_s, INET6_ADDRSTRLEN + 1 ))
-                  perror("Something died in inet_ntop");
-            }
+         if ( ! ip_ntop(&cxtbuffer->s_ip, src_s, IP_ADDRMAX, IP_NUMERIC_DEC) )
+            perror("Something died in inet_ntop for src");
+         if ( ! ip_ntop(&cxtbuffer->d_ip, dst_s, IP_ADDRMAX, IP_NUMERIC_DEC) )
+            perror("Something died in inet_ntop for dest");
 
+         if ( verbose == 1 ) {
             printf("%ld%09ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
                                                 cxtbuffer->proto,src_s,ntohs(cxtbuffer->s_port));
             printf("%s|%u|%ju|%ju|",dst_s,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,cxtbuffer->s_total_bytes);
@@ -468,47 +419,26 @@ void cxtbuffer_write () {
                                      cxtbuffer->d_tcpFlags);
          }
 
-         if ( cxtbuffer->ipversion == AF_INET ) {
-            s_ip_t = ntohl(cxtbuffer->s_ip.s6_addr32[0]);
-            d_ip_t = ntohl(cxtbuffer->d_ip.s6_addr32[0]);
-
-            fprintf(cxtFile,"%ld%09ju|%s|%s|%ld|%u|%u|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
-                                                         cxtbuffer->proto,s_ip_t,ntohs(cxtbuffer->s_port));
-            fprintf(cxtFile,"%u|%u|%ju|%ju|",d_ip_t,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,
-                                             cxtbuffer->s_total_bytes);
-            fprintf(cxtFile,"%ju|%ju|%u|%u",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
-                                              cxtbuffer->d_tcpFlags);
-         }
-         else if ( cxtbuffer->ipversion == AF_INET6 ) {
-            if ( verbose != 1 ) {
-               if (!inet_ntop(AF_INET6, &cxtbuffer->s_ip, src_s, INET6_ADDRSTRLEN + 1 ))
-                  perror("Something died in inet_ntop");
-               if (!inet_ntop(AF_INET6, &cxtbuffer->d_ip, dst_s, INET6_ADDRSTRLEN + 1 ))
-                  perror("Something died in inet_ntop");
-            }
-            fprintf(cxtFile,"%ld%09ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
+         fprintf(cxtFile,"%ld%09ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
                                                          cxtbuffer->proto,src_s,ntohs(cxtbuffer->s_port));
-            fprintf(cxtFile,"%s|%u|%ju|%ju|",dst_s,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,
+         fprintf(cxtFile,"%s|%u|%ju|%ju|",dst_s,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,
                                              cxtbuffer->s_total_bytes);
-            fprintf(cxtFile,"%ju|%ju|%u|%u",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
+         fprintf(cxtFile,"%ju|%ju|%u|%u",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
                                               cxtbuffer->d_tcpFlags);
-         }
 
          /* print the byte offset if reading from a file */
          if ( mode & MODE_FILE )
-            fprintf(cxtFile, "|%lld", cxtbuffer->start_offset);
+            fprintf(cxtFile, "|%lld", (long long int)cxtbuffer->start_offset);
 
          fprintf(cxtFile, "\n");
 
          next = cxtbuffer->next;
-         free(cxtbuffer);
          cxtbuffer=NULL;
          cxtbuffer = next;
       }
       fclose(cxtFile);
    }
    cxtbuffer = NULL;
-   free(cxtfname);
 }
 
 void end_all_sessions() {
@@ -586,7 +516,6 @@ void dump_active() {
 
 static int set_chroot(void) {
    char *absdir;
-   char *logdir;
    int abslen;
 
    /* logdir = get_abs_path(logpath); */
@@ -808,14 +737,11 @@ static void usage() {
 int main(int argc, char *argv[]) {
 
    int ch, fromfile, setfilter, version, drop_privs_flag, daemon_flag, chroot_flag;
-   int use_syslog = 0;
-   struct in_addr addr;
    struct bpf_program cfilter;
-   char *bpff, errbuf[PCAP_ERRBUF_SIZE], *user_filter;
-   char *net_ip_string;
+   char *bpff, errbuf[PCAP_ERRBUF_SIZE];
    const char *pcap_file = NULL;
 
-   bpf_u_int32 net_mask;
+   bpf_u_int32 net_mask = 0;
    ch = fromfile = setfilter = version = drop_privs_flag = daemon_flag = 0;
    dev = "eth0";
    bpff = "";
@@ -832,6 +758,7 @@ int main(int argc, char *argv[]) {
    signal(SIGQUIT, game_over);
    signal(SIGHUP,  dump_active);
    signal(SIGALRM, set_end_sessions);
+
 
    while ((ch = getopt(argc, argv, "b:d:DT:g:hi:p:P:r:u:v")) != -1)
    switch (ch) {

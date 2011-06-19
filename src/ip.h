@@ -134,12 +134,13 @@ static inline int ip_isset(const ip_t *ip)
   return ( ip &&
            (
              (
-               ( ip->ip32[0] ) || 
-               ( ip->family == AF_INET6 ) &&
-               ( ip->ip32[1] || 
-                 ip->ip32[2] || 
-                 ip->ip32[3] || 
-                 ip->bits != 128 )
+               ( ip->ip32[0] ) || (
+                 ( ip->family == AF_INET6 ) &&
+                 ( ip->ip32[1] ||
+                   ip->ip32[2] ||
+                   ip->ip32[3] ||
+                   ip->bits != 128 )
+               )
              ) || (
                ( ip->family == AF_INET ) &&
                ( ip->bits != 32 )
