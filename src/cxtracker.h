@@ -20,6 +20,9 @@
 **
 */
 
+#ifndef __CXTRACKER_H__
+#define __CXTRACKER_H__
+
 /*  I N C L U D E S  **********************************************************/
 #include "ip.h"
 
@@ -323,5 +326,4 @@ typedef struct _connection {
         struct _connection *next;       /* Pointer to next connection */
 } connection;
 
-/*  P R O T O T Y P E S  ******************************************************/
-
+#endif /* __CXTRACKER_H__ */

@@ -8,9 +8,10 @@ LIBS=-lpcap
 LDFLAGS=
 
 SRC= cxtracker.c cxtracker.h \
+format.c format.h \
 ip.c ip.h
 
-OBJS= ip.o cxtracker.o
+OBJS= ip.o format.o cxtracker.o
 
 TARGETS=cxtracker
 

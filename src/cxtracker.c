@@ -41,13 +41,15 @@
 #include <ctype.h>
 #include "cxtracker.h"
 
+#include "format.h"
+
 /*  G L O B A L E S  **********************************************************/
 u_int64_t    cxtrackerid;
 time_t       timecnt,tstamp;
 pcap_t       *handle;
 connection   *bucket[BUCKET_SIZE];
 connection   *cxtbuffer = NULL;
-static char  *dev,*dpath,*chroot_dir;
+static char  *dev,*dpath,*chroot_dir,*output_format;
 static char  *group_name, *user_name, *true_pid_name;
 static char  *pidfile = "cxtracker.pid";
 static char  *pidpath = "/var/run";
@@ -384,12 +386,7 @@ void cxtbuffer_write () {
    if ( cxtbuffer == NULL ) { return; }
    connection *next;
    next = NULL;
-   char stime[80], ltime[80];
-   time_t tot_time;
-   static char src_s[IP_ADDRMAX];
-   static char dst_s[IP_ADDRMAX];
-
-   FILE *cxtFile;
+      FILE *cxtFile;
    char cxtfname[4096];
 
    sprintf(cxtfname, "%s/stats.%s.%ld", dpath, dev, tstamp);
@@ -401,36 +398,7 @@ void cxtbuffer_write () {
    else {
 
       while ( cxtbuffer != NULL ) {
-
-         tot_time = cxtbuffer->last_pkt_time - cxtbuffer->start_time;
-         strftime(stime, 80, "%F %H:%M:%S", gmtime(&cxtbuffer->start_time));
-         strftime(ltime, 80, "%F %H:%M:%S", gmtime(&cxtbuffer->last_pkt_time));
-
-         if ( ! ip_ntop(&cxtbuffer->s_ip, src_s, IP_ADDRMAX, IP_NUMERIC_DEC) )
-            perror("Something died in inet_ntop for src");
-         if ( ! ip_ntop(&cxtbuffer->d_ip, dst_s, IP_ADDRMAX, IP_NUMERIC_DEC) )
-            perror("Something died in inet_ntop for dest");
-
-         if ( verbose == 1 ) {
-            printf("%ld%09ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
-                                                cxtbuffer->proto,src_s,ntohs(cxtbuffer->s_port));
-            printf("%s|%u|%ju|%ju|",dst_s,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,cxtbuffer->s_total_bytes);
-            printf("%ju|%ju|%u|%u\n",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
-                                     cxtbuffer->d_tcpFlags);
-         }
-
-         fprintf(cxtFile,"%ld%09ju|%s|%s|%ld|%u|%s|%u|",cxtbuffer->start_time,cxtbuffer->cxid,stime,ltime,tot_time,
-                                                         cxtbuffer->proto,src_s,ntohs(cxtbuffer->s_port));
-         fprintf(cxtFile,"%s|%u|%ju|%ju|",dst_s,ntohs(cxtbuffer->d_port),cxtbuffer->s_total_pkts,
-                                             cxtbuffer->s_total_bytes);
-         fprintf(cxtFile,"%ju|%ju|%u|%u",cxtbuffer->d_total_pkts,cxtbuffer->d_total_bytes,cxtbuffer->s_tcpFlags,
-                                              cxtbuffer->d_tcpFlags);
-
-         /* print the byte offset if reading from a file */
-         if ( mode & MODE_FILE )
-            fprintf(cxtFile, "|%lld", (long long int)cxtbuffer->start_offset);
-
-         fprintf(cxtFile, "\n");
+         format_write(cxtFile, cxtbuffer);
 
          next = cxtbuffer->next;
          cxtbuffer=NULL;
@@ -499,7 +467,10 @@ void game_over() {
       end_all_sessions();
       cxtbuffer_write();
       pcap_close(handle);
-      exit (0);
+
+      format_clear();
+
+      exit(0);
    }
    intr_flag = 1;
 }
@@ -714,25 +685,41 @@ static int go_daemon() {
     return daemonize(NULL);
 }
 
-static void usage() {
-    printf("USAGE:\n");
-    printf(" $ cxtracker [options]\n");
-    printf("\n");
-    printf(" OPTIONS:\n");
-    printf("\n");
-    printf(" -i             : network device (default: eth0)\n");
-    printf(" -b             : berkeley packet filter\n");
-    printf(" -d             : directory to dump sessions files in\n");
-    printf(" -u             : user\n");
-    printf(" -g             : group\n");
-    printf(" -D             : enables daemon mode\n");
-    printf(" -T             : dir to chroot into\n");
-    printf(" -p             : pidfile\n");
-    printf(" -P             : path to pidfile\n");
-    printf(" -r             : pcap file to read\n");
-    printf(" -h             : this help message\n");
-    printf(" -v             : verbose\n\n");
-}
+static void usage(const char *program_name) {
+    fprintf(stdout, "\n");
+    fprintf(stdout, "USAGE: %s [-options]\n", program_name);
+    fprintf(stdout, "\n");
+    fprintf(stdout, " General Options:\n");
+    fprintf(stdout, "  -?            You're reading it.\n");
+    fprintf(stdout, "  -v            Verbose output.\n");
+//    fprintf(stdout, "  -V            Version and compiled in options.\n");
+    fprintf(stdout, "  -i <iface>    Interface to sniff from.\n");
+    fprintf(stdout, "  -f <format>   Output format line. See Format options.\n");
+    fprintf(stdout, "  -b <bfp>      Berkley packet filter).\n");
+    fprintf(stdout, "  -d <dir>      Directory to write session files to.\n");
+    fprintf(stdout, "  -D            Enable daemon mode.\n");
+    fprintf(stdout, "  -u <user>     User to drop priveleges to after daemonising.\n");
+    fprintf(stdout, "  -g <group>    Group to drop priveleges to after daemonising.\n");
+    fprintf(stdout, "  -T <dir>      Direct to chroot into.\n");
+    fprintf(stdout, "  -p <file>     Path to PID file.\n");
+    fprintf(stdout, "  -r <pcap>     PCAP file to read.\n");
+    fprintf(stdout, "\n");
+    fprintf(stdout, " Long Options:\n");
+    fprintf(stdout, "  --help        Same as '?'\n");
+//    fprintf(stdout, "  --version     Same as 'V'\n");
+    fprintf(stdout, "  --interface   Same as 'i'\n");
+    fprintf(stdout, "  --format      Same as 'f'\n");
+    fprintf(stdout, "  --bpf         Same as 'b'\n");
+    fprintf(stdout, "  --log-dir     Same as 'd'\n");
+    fprintf(stdout, "  --daemonize   Same as 'D'\n");
+    fprintf(stdout, "  --user        Same as 'u'\n");
+    fprintf(stdout, "  --group       Same as 'g'\n");
+    fprintf(stdout, "  --chroot-dir  Same as 'T'\n");
+    fprintf(stdout, "  --pid-file    Same as 'p'\n");
+    fprintf(stdout, "  --pcap-file   Same as 'r'\n");
+    fprintf(stdout, "\n");
+    format_options();
+ }
 
 int main(int argc, char *argv[]) {
 
@@ -740,6 +727,23 @@ int main(int argc, char *argv[]) {
    struct bpf_program cfilter;
    char *bpff, errbuf[PCAP_ERRBUF_SIZE];
    const char *pcap_file = NULL;
+   extern char *optarg;
+   int long_option_index = 0;
+   static struct option long_options[] = {
+     {"help", 0, NULL, '?'},
+     {"interface", 1, NULL, 'i'},
+     {"format", 1, NULL, 'f'},
+     {"bpf", 1, NULL, 'b'},
+     {"log-dir", 1, NULL, 'd'},
+     {"daemonize", 0, NULL, 'D'},
+     {"user", 1, NULL, 'u'},
+     {"group", 1, NULL, 'g'},
+     {"chroot-dir", 1, NULL, 'T'},
+     {"pid-file", 1, NULL, 'p'},
+     {"pcap-file", 1, NULL, 'r'},
+     {0, 0, 0, 0}
+   };
+
 
    bpf_u_int32 net_mask = 0;
    ch = fromfile = setfilter = version = drop_privs_flag = daemon_flag = 0;
@@ -747,6 +751,7 @@ int main(int argc, char *argv[]) {
    bpff = "";
    chroot_dir = "/tmp/";
    dpath = "./";
+   output_format = "%cxd|%stm|%etm|%dur|%pro|%sin|%spt|%din|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl";
    cxtbuffer = NULL;
    cxtrackerid  = 0;
    inpacket = intr_flag = chroot_flag = 0;
@@ -759,9 +764,8 @@ int main(int argc, char *argv[]) {
    signal(SIGHUP,  dump_active);
    signal(SIGALRM, set_end_sessions);
 
-
-   while ((ch = getopt(argc, argv, "b:d:DT:g:hi:p:P:r:u:v")) != -1)
-   switch (ch) {
+   while( (ch=getopt_long(argc, argv, "?b:d:DT:f:g:i:p:P:r:u:v", long_options, &long_option_index)) != EOF )
+     switch (ch) {
       case 'i':
          dev = strdup(optarg);
          mode |= MODE_DEV;
@@ -772,11 +776,14 @@ int main(int argc, char *argv[]) {
       case 'v':
          verbose = 1;
          break;
+      case 'f':
+         output_format = strdup(optarg);
+         break;
       case 'd':
          dpath = strdup(optarg);
          break;
-      case 'h':
-         usage();
+      case '?':
+         usage(argv[0]);
          exit(0);
          break;
       case 'D':
@@ -810,10 +817,14 @@ int main(int argc, char *argv[]) {
 
    errbuf[0] = '\0';
 
+   // validate the output format string
+   format_validate(output_format);
+
    // specify reading from a device OR a file and not both
    if ( (mode & MODE_DEV) && (mode & MODE_FILE) )
    {
       printf("[*] You must specify a device OR file to read from, not both.\n");
+      usage(argv[0]);
       exit(1);
    }
    else if ( (mode & MODE_FILE) && pcap_file) {
