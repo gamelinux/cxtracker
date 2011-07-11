@@ -55,6 +55,7 @@ static char  *pidfile = "cxtracker.pid";
 static char  *pidpath = "/var/run";
 static int   verbose, inpacket, intr_flag, use_syslog;
 static int   mode;
+ip_config_t  ip_config;
 
 
 /*  I N T E R N A L   P R O T O T Y P E S  ************************************/
@@ -105,8 +106,8 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
       ip4 = (ip4_header *) (packet + eth_header_len);
       p_bytes = (ip4->ip_len - (IP_HL(ip4)*4));
 
-      ip_set_raw(&ip_src, &ip4->ip_src, AF_INET);
-      ip_set_raw(&ip_dst, &ip4->ip_dst, AF_INET);
+      ip_set(&ip_config, &ip_src, &ip4->ip_src, AF_INET);
+      ip_set(&ip_config, &ip_dst, &ip4->ip_dst, AF_INET);
 
       if ( ip4->ip_p == IP_PROTO_TCP ) {
          tcp_header *tcph;
@@ -145,8 +146,8 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
       ip6_header *ip6;
       ip6 = (ip6_header *) (packet + eth_header_len);
 
-      ip_set_raw(&ip_src, &ip6->ip_src, AF_INET6);
-      ip_set_raw(&ip_dst, &ip6->ip_dst, AF_INET6);
+      ip_set(&ip_config, &ip_src, &ip6->ip_src, AF_INET6);
+      ip_set(&ip_config, &ip_dst, &ip6->ip_dst, AF_INET6);
 
       if ( ip6->next == IP_PROTO_TCP ) {
          tcp_header *tcph;
@@ -195,10 +196,7 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
    connection *head = NULL;
 
    /* for non-ipv6 addresses, indexes 1, 2 and 3 are zero and don't influence the hash */
-   uint64_t hash = ( ip_src.ip32[0] + ip_src.ip32[1] +
-                     ip_src.ip32[2] + ip_src.ip32[3] +
-                     ip_dst.ip32[0] + ip_dst.ip32[1] +
-                     ip_dst.ip32[2] + ip_dst.ip32[3] ) % BUCKET_SIZE;
+   uint64_t hash = ip_hash(&ip_src, &ip_dst, BUCKET_SIZE);
 
    cxt = bucket[hash];
    head = cxt;
@@ -823,7 +821,7 @@ int main(int argc, char *argv[]) {
    // specify reading from a device OR a file and not both
    if ( (mode & MODE_DEV) && (mode & MODE_FILE) )
    {
-      printf("[*] You must specify a device OR file to read from, not both.\n");
+      printf("[!] You must specify a device OR file to read from, not both.\n");
       usage(argv[0]);
       exit(1);
    }
@@ -837,6 +835,16 @@ int main(int argc, char *argv[]) {
          printf(" - OK\n");
       }
 
+      // in pcap_open_offline(), libpcap appears to use a static buffer
+      // for reading in the file. we must use memcpy's to ensure data
+      // persists as expected
+      if ( ip_init(&ip_config, IP_SET_MEMCPY) )
+      {
+        printf("[!] Unable to initialise the IP library.\n");
+        exit(1);
+      }
+      else
+        printf("[*] IP library using \"memcpy\" set.\n");
    }
    else if ( (mode & MODE_DEV) && dev) {
       if (getuid()) {
@@ -856,6 +864,17 @@ int main(int argc, char *argv[]) {
          pcap_close(handle);
          exit(1);
       }
+
+      // in pcap_open_live(), libpcap maintains a heap allocated buffer
+      // for reading off the wire. we can use pointer copies here for 
+      // improved speed
+      if ( ip_init(&ip_config, IP_SET_POINTER_COPY) )
+      {
+        printf("[*] Unable to initialise the IP library.\n");
+        exit(1);
+      }
+      else
+        printf("[*] IP library using \"pointer copy\" set.\n");
 
       if ( chroot_flag == 1 ) {
          set_chroot();

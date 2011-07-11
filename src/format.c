@@ -353,7 +353,7 @@ void format_write_ip_source_numeric(FILE *fd, const connection *cxt, const char 
 {
     char ip_s[IP_ADDRMAX];
 
-    if ( ! ip_ntop(&cxt->s_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_DEC) )
+    if ( ip_ntop(&cxt->s_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_DEC) )
         perror("Something died in ip_ntop for src");
 
     fprintf(fd, "%s%s", prefix, ip_s);
@@ -363,7 +363,7 @@ void format_write_ip_source(FILE *fd, const connection *cxt, const char *prefix)
 {
     char ip_s[IP_ADDRMAX];
 
-    if ( ! ip_ntop(&cxt->s_ip, ip_s, IP_ADDRMAX, 0) )
+    if ( ip_ntop(&cxt->s_ip, ip_s, IP_ADDRMAX, 0) )
         perror("Something died in ip_ntop for src");
 
     fprintf(fd, "%s%s", prefix, ip_s);
@@ -373,7 +373,7 @@ void format_write_ip_source_hex(FILE *fd, const connection *cxt, const char *pre
 {
     char ip_s[IP_ADDRMAX];
 
-    if ( ! ip_ntop(&cxt->s_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_HEX) )
+    if ( ip_ntop(&cxt->s_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_HEX) )
         perror("Something died in ip_ntop for src");
 
     fprintf(fd, "%s%s", prefix, ip_s);
@@ -383,7 +383,7 @@ void format_write_ip_destination_numeric(FILE *fd, const connection *cxt, const 
 {
     char ip_s[IP_ADDRMAX];
 
-    if ( ! ip_ntop(&cxt->d_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_DEC) )
+    if ( ip_ntop(&cxt->d_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_DEC) )
         perror("Something died in ip_ntop for dest");
 
     fprintf(fd, "%s%s", prefix, ip_s);
@@ -393,7 +393,7 @@ void format_write_ip_destination(FILE *fd, const connection *cxt, const char *pr
 {
     char ip_s[IP_ADDRMAX];
 
-    if ( ! ip_ntop(&cxt->d_ip, ip_s, IP_ADDRMAX, 0) )
+    if ( ip_ntop(&cxt->d_ip, ip_s, IP_ADDRMAX, 0) )
         perror("Something died in ip_ntop for dest");
 
     fprintf(fd, "%s%s", prefix, ip_s);
@@ -403,7 +403,7 @@ void format_write_ip_destination_hex(FILE *fd, const connection *cxt, const char
 {
     char ip_s[IP_ADDRMAX];
 
-    if ( ! ip_ntop(&cxt->d_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_HEX) )
+    if ( ip_ntop(&cxt->d_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_HEX) )
         perror("Something died in ip_ntop for dest");
 
     fprintf(fd, "%s%s", prefix, ip_s);
