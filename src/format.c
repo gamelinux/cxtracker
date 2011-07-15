@@ -45,9 +45,11 @@ void format_write_ip_family(FILE *fd, const connection *cxt, const char *prefix)
 void format_write_ip_source(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_ip_source_hex(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_ip_source_numeric(FILE *fd, const connection *cxt, const char *prefix);
+void format_write_ip_source_fqdn(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_ip_destination(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_ip_destination_hex(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_ip_destination_numeric(FILE *fd, const connection *cxt, const char *prefix);
+void format_write_ip_destination_fqdn(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_ip_port_source(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_ip_port_destination(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_packets_source(FILE *fd, const connection *cxt, const char *prefix);
@@ -72,9 +74,11 @@ void format_options()
     fprintf(stdout, "  %%sin          source IP [IPv4 = integer, IPv6 = literal]\n");
     fprintf(stdout, "  %%sip          source IP [IPv4/IPv6 = literal]\n");
     fprintf(stdout, "  %%six          source IP [IPv4/IPv6 = hex\n");
+    fprintf(stdout, "  %%sih          source IP [IPv4/IPv6 = host lookup\n");
     fprintf(stdout, "  %%din          destination IP [IPv4 = integer, IPv6 = literal]\n");
     fprintf(stdout, "  %%dip          destination IP [IPv4/IPv6 = literal]\n");
     fprintf(stdout, "  %%dix          destination IP [IPv4/IPv6 = hex\n");
+    fprintf(stdout, "  %%dih          destination IP [IPv4/IPv6 = host lookup\n");
     fprintf(stdout, "  %%spt          source port\n");
     fprintf(stdout, "  %%dpt          destination port\n");
     fprintf(stdout, "  %%spk          total packets sent from the source IP during the session\n");
@@ -85,21 +89,49 @@ void format_options()
     fprintf(stdout, "  %%dfl          cumulative destination IP TCP flags sent during the session\n");
     fprintf(stdout, "  %%spo          pcap file offset of start packet in session\n");
     fprintf(stdout, "  %%epo          pcap file offset of first byte after last packet in session\n");
+    fprintf(stdout, "\n");
+    fprintf(stdout, " Format Meta-Options:\n");
+    fprintf(stdout, "  sguil          Formatted output compatible with sguil\n");
+    fprintf(stdout, "  nsmf           Formatted output compatible with NSMF\n");
+    fprintf(stdout, "\n");
 }
 
 void format_validate(const char *format)
 {
   /*
   */
+    char *format_qualified = NULL;
 
-    const char *fp_s = format;
-    const char *fp_e = format;
+    const char *fp_s;
+    const char *fp_e;
+
     void (*func)(FILE *, const struct _connection *, char *) = NULL;
     int match = 0;
+    int format_length = 0;
 
-    int format_length = strlen(format);
+    // check for pre-packaged options first
+    if ( strncmp(format, "sguil", 5) == 0 )
+        format_qualified = strdup("%cxd|%stm|%etm|%dur|%pro|%sin|%spt|%din|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl");
+    else if ( strncmp(format, "nsmf", 5) == 0 )
+        format_qualified = strdup("%cxd|%stm|%etm|%dur|%pro|%sip|%spt|%dip|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl");
+    else
+        format_qualified = strdup(format);
 
-    while ( (fp_e-format) < format_length )
+    if ( NULL == format_qualified )
+    {
+        fprintf(stderr, "FATAL: Unable to allocate memory for the custom formatter!\n");
+        exit(1);
+    }
+
+    format_length = strlen(format_qualified);
+
+    // set up our iterators
+    fp_s = format_qualified;
+    fp_e = format_qualified;
+
+    printf("[*] Using output format: %s\n", format_qualified);
+
+    while ( (fp_e-format_qualified) < format_length )
     {
         // check if it's time to match
         if ( strncmp(fp_e, "%", 1) == 0 )
@@ -149,6 +181,11 @@ void format_validate(const char *format)
                 match = 4;
                 func = (void *)&format_write_ip_source_hex;
             }
+            else if ( strncmp(fp_e, "%sih", 4) == 0 )
+            {
+                match = 4;
+                func = (void *)&format_write_ip_source_fqdn;
+            }
             else if ( strncmp(fp_e, "%din", 4) == 0 )
             {
                 match = 4;
@@ -163,6 +200,11 @@ void format_validate(const char *format)
             {
                 match = 4;
                 func = (void *)&format_write_ip_destination_hex;
+            }
+            else if ( strncmp(fp_e, "%dih", 4) == 0 )
+            {
+                match = 4;
+                func = (void *)&format_write_ip_destination_fqdn;
             }
             else if ( strncmp(fp_e, "%spt", 4) == 0 )
             {
@@ -227,6 +269,7 @@ void format_validate(const char *format)
                 if ( NULL == prefix )
                 {
                     fprintf(stderr, "FATAL: Unable to allocate memory for the custom formatter!\n");
+                    free(format_qualified);
                     exit(1);
                 }
 
@@ -253,6 +296,7 @@ void format_validate(const char *format)
         if ( NULL == prefix )
         {
             fprintf(stderr, "FATAL: Unable to allocate memory for the custom formatter!\n");
+            free(format_qualified);
             exit(1);
         }
 
@@ -260,6 +304,9 @@ void format_validate(const char *format)
 
         format_function_append(&custom, (void *)&format_write_custom, prefix);
     }
+
+    // clean up after ourselves;
+    free(format_qualified);
 }
 
 void format_function_append(format_t **head, void (*func)(FILE *, const struct _connection *, char *), char *prefix)
@@ -359,11 +406,21 @@ void format_write_ip_source_numeric(FILE *fd, const connection *cxt, const char 
     fprintf(fd, "%s%s", prefix, ip_s);
 }
 
-void format_write_ip_source(FILE *fd, const connection *cxt, const char *prefix)
+void format_write_ip_source_fqdn(FILE *fd, const connection *cxt, const char *prefix)
 {
     char ip_s[IP_ADDRMAX];
 
     if ( ip_ntop(&cxt->s_ip, ip_s, IP_ADDRMAX, 0) )
+        perror("Something died in ip_ntop for src");
+
+    fprintf(fd, "%s%s", prefix, ip_s);
+}
+
+void format_write_ip_source(FILE *fd, const connection *cxt, const char *prefix)
+{
+    char ip_s[IP_ADDRMAX];
+
+    if ( ip_ntop(&cxt->s_ip, ip_s, IP_ADDRMAX, IP_NUMERIC) )
         perror("Something died in ip_ntop for src");
 
     fprintf(fd, "%s%s", prefix, ip_s);
@@ -389,11 +446,21 @@ void format_write_ip_destination_numeric(FILE *fd, const connection *cxt, const 
     fprintf(fd, "%s%s", prefix, ip_s);
 }
 
-void format_write_ip_destination(FILE *fd, const connection *cxt, const char *prefix)
+void format_write_ip_destination_fqdn(FILE *fd, const connection *cxt, const char *prefix)
 {
     char ip_s[IP_ADDRMAX];
 
     if ( ip_ntop(&cxt->d_ip, ip_s, IP_ADDRMAX, 0) )
+        perror("Something died in ip_ntop for dest");
+
+    fprintf(fd, "%s%s", prefix, ip_s);
+}
+
+void format_write_ip_destination(FILE *fd, const connection *cxt, const char *prefix)
+{
+    char ip_s[IP_ADDRMAX];
+
+    if ( ip_ntop(&cxt->d_ip, ip_s, IP_ADDRMAX, IP_NUMERIC) )
         perror("Something died in ip_ntop for dest");
 
     fprintf(fd, "%s%s", prefix, ip_s);

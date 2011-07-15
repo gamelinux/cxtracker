@@ -749,7 +749,7 @@ int main(int argc, char *argv[]) {
    bpff = "";
    chroot_dir = "/tmp/";
    dpath = "./";
-   output_format = "%cxd|%stm|%etm|%dur|%pro|%sin|%spt|%din|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl";
+   output_format = "sguil";
    cxtbuffer = NULL;
    cxtrackerid  = 0;
    inpacket = intr_flag = chroot_flag = 0;
