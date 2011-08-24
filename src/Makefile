@@ -21,10 +21,10 @@ cxtracker: $(OBJS)
 	$(CC) $(OBJS) -o cxtracker $(LIBS) $(LDFLAGS)
 
 debug: $(OBJS)
-	$(CC) $(OBJS) -o cxtracker $(DCFLAGS) $(LDFLAGS)
+	$(CC) $(OBJS) -o cxtracker $(LIBS) $(DCFLAGS) $(LDFLAGS)
 
 profile: $(OBJS)
-	$(CC) $(OBJS) -o cxtracker $(RCFLAGS) $(LDFLAGS)
+	$(CC) $(OBJS) -o cxtracker $(LIBS) $(RCFLAGS) $(LDFLAGS)
 
 clean:
 	-rm -f ${OBJS} ${TARGETS}
