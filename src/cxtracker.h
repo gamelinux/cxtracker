@@ -27,7 +27,7 @@
 #include "ip.h"
 
 /*  D E F I N E S  ************************************************************/
-#define VERSION                       "0.9.6"
+#define VERSION                       "0.9.7"
 #define TIMEOUT                       45
 #define BUCKET_SIZE                   1211
 #define SNAPLENGTH                    1600
