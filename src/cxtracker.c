@@ -693,7 +693,7 @@ static void usage(const char *program_name) {
 //    fprintf(stdout, "  -V            Version and compiled in options.\n");
     fprintf(stdout, "  -i <iface>    Interface to sniff from.\n");
     fprintf(stdout, "  -f <format>   Output format line. See Format options.\n");
-    fprintf(stdout, "  -b <bfp>      Berkley packet filter).\n");
+    fprintf(stdout, "  -b <bfp>      Berkley packet filter.\n");
     fprintf(stdout, "  -d <dir>      Directory to write session files to.\n");
     fprintf(stdout, "  -D            Enable daemon mode.\n");
     fprintf(stdout, "  -u <user>     User to drop priveleges to after daemonising.\n");
