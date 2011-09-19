@@ -23,6 +23,7 @@ cxtracker2db.pl - Load session metadata from cxtracker into a db
 
  --dir          : set the dir to monitor for session files
  --daemon       : enables daemon mode
+ --hostname     : spesify the hostname
  --debug        : enable debug messages (default: 0 (disabled))
  --help         : this help message
  --version      : show cxtracker2db.pl version
@@ -33,7 +34,7 @@ our $VERSION       = 0.1;
 our $DEBUG         = 0;
 our $DAEMON        = 0;
 our $TIMEOUT       = 5;
-our $HOSTNAME      = q(aruba);
+our $HOSTNAME      = q(localhost);
 my  $SDIR          = "/nsm_data/$HOSTNAME/session/";
 my  $FDIR          = "$SDIR/failed/";
 my  $LOGFILE       = q(/var/log/cxtracker2db.log);
@@ -49,6 +50,7 @@ my $SANCP_DB       = {};
 
 GetOptions(
    'dir=s'         => \$SDIR,
+   'hostname=s'    => \$HOSTNAME,
    'debug=s'       => \$DEBUG,
    'daemon'        => \$DAEMON,
 );

@@ -92,6 +92,7 @@ void format_options()
     fprintf(stdout, "\n");
     fprintf(stdout, " Format Meta-Options:\n");
     fprintf(stdout, "  sguil          Formatted output compatible with sguil\n");
+    fprintf(stdout, "  openfpc        Formatted output compatible with openfpc\n");
     fprintf(stdout, "  nsmf           Formatted output compatible with NSMF\n");
     fprintf(stdout, "\n");
 }
@@ -110,7 +111,7 @@ void format_validate(const char *format)
     int format_length = 0;
 
     // check for pre-packaged options first
-    if ( strncmp(format, "sguil", 5) == 0 )
+    if ( strncmp(format, "sguil", 5) == 0 || strncmp(format, "openfpc", 5) == 0 )
         format_qualified = strdup("%cxd|%stm|%etm|%dur|%pro|%sin|%spt|%din|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl");
     else if ( strncmp(format, "nsmf", 5) == 0 )
         format_qualified = strdup("%cxd|%stm|%etm|%dur|%pro|%sip|%spt|%dip|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl");
