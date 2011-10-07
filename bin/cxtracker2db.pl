@@ -269,6 +269,18 @@ sub expand_ipv6 {
    return (lc(join ':', @ip_long));
 }
 
+=head2 sanitize_table_name
+
+ Takes a string and makes it MySQL table friendly...
+
+=cut
+
+sub sanitize_table_name {
+   my $string = shift;
+   $string =~ s/[^A-Za-z_]/_/g;
+   return $string;
+}
+
 =head2 put_session2db
 
  takes a session line as input and stores it in DB
@@ -496,7 +508,7 @@ sub get_table_name {
    my $DATE = `date --iso`;
    $DATE =~ s/\-//g;
    $DATE =~ s/\n$//;
-   my $tablename = "session_" . "$HOSTNAME" . "_" . "$DATE";
+   my $tablename = "session_" . sanitize_table_name($HOSTNAME) . "_" . "$DATE";
    return $tablename;
 }
 
