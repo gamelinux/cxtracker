@@ -699,7 +699,8 @@ static void usage(const char *program_name) {
     fprintf(stdout, "  -u <user>     User to drop priveleges to after daemonising.\n");
     fprintf(stdout, "  -g <group>    Group to drop priveleges to after daemonising.\n");
     fprintf(stdout, "  -T <dir>      Direct to chroot into.\n");
-    fprintf(stdout, "  -p <file>     Path to PID file.\n");
+    fprintf(stdout, "  -P <path>     Path to PID file (/var/run).\n");
+    fprintf(stdout, "  -p <file>     Name of pidfile (cxtracker.pid).\n");
     fprintf(stdout, "  -r <pcap>     PCAP file to read.\n");
     fprintf(stdout, "\n");
     fprintf(stdout, " Long Options:\n");
