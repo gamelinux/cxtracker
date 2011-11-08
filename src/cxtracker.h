@@ -26,6 +26,10 @@
 /*  I N C L U D E S  **********************************************************/
 #include "ip.h"
 
+#ifdef __FreeBSD__
+#include <sys/types.h>
+#endif /* __FreeBSD__ */
+
 /*  D E F I N E S  ************************************************************/
 #define VERSION                       "0.9.7"
 #define TIMEOUT                       45

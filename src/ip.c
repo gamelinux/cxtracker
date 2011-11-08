@@ -24,7 +24,10 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+
+#ifndef __FreeBSD__
 #include <error.h>
+#endif /* __FreeBSD__ */
 
 // private functions
 

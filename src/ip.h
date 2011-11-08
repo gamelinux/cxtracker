@@ -26,6 +26,10 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
+#ifdef __FreeBSD__
+#include <sys/socket.h>
+#endif /* __FreeBSD__ */
+
 #define IP_ADDRMAX       NI_MAXHOST
 
 // TODO: raise these values to deconflict with the NI_* flags
