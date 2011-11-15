@@ -38,6 +38,7 @@
 
 #define MODE_DEV                      0x01
 #define MODE_FILE                     0x02
+#define MODE_DUMP                     0x10
 
 #define ETHERNET_TYPE_IP              0x0800
 #define ETHERNET_TYPE_ARP             0x0806
@@ -74,6 +75,12 @@
 #define TF_NORESERVED (TF_FIN|TF_SYN|TF_RST|TF_PUSH|TF_ACK|TF_URG)
 #define TF_FLAGS      (TF_FIN|TF_SYN|TF_RST|TF_ACK|TF_URG|TF_ECE|TF_CWR)
 
+#define KILOBYTE    1<<10
+#define MEGABYTE    1<<20
+#define GIGABYTE    1<<30
+#define TERABYTE    1<<40
+
+
 #define SUCCESS     0
 #define ERROR       1
 #define STDBUF      1024
@@ -101,7 +108,7 @@ typedef struct _ether_header {
          u_short eth_t_8_vid;
          u_short eth_t_8_type;
       } qt;
-   
+
       struct qot
       {
          u_short eth_t_80212;            /* ethernet type/802.1QinQ */
@@ -323,11 +330,41 @@ typedef struct _connection {
         u_int64_t  d_total_bytes;       /* total destination bytes */
         u_int8_t   s_tcpFlags;          /* tcpflags sent by source */
         u_int8_t   d_tcpFlags;          /* tcpflags sent by destination */
+        char       start_dump[STDBUF];  /* dump file of starting packet */
         int64_t    start_offset;        /* byte offset of the starting packet */
         time_t     start_time;          /* connection start time */
+        char       last_dump[STDBUF];   /* dump file of last packet */
+        int64_t    last_offset;         /* byte offset of the last packet */
         time_t     last_pkt_time;       /* last seen packet time */
+
         struct _connection *prev;       /* Pointer to prev connection */
         struct _connection *next;       /* Pointer to next connection */
 } connection;
+
+typedef enum {
+  KILOBYTES = 1,
+  MEGABYTES,
+  GIGABYTES,
+  TERABYTES,
+
+  SECONDS,
+  MINUTES,
+  HOURS,
+  DAYS
+} rollover_type;
+
+static char *rollover_names[] = {
+  "unknown",
+
+  "kilobytes",
+  "megabytes",
+  "gigabytes",
+  "terabytes",
+
+  "seconds",
+  "minutes",
+  "hours",
+  "days"
+};
 
 #endif /* __CXTRACKER_H__ */

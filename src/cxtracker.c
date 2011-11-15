@@ -45,16 +45,29 @@
 
 /*  G L O B A L E S  **********************************************************/
 u_int64_t    cxtrackerid;
-time_t       timecnt,tstamp;
-pcap_t       *handle;
+time_t       tstamp;
+
+pcap_t        *handle;
+pcap_dumper_t *dump_handle;
+
 connection   *bucket[BUCKET_SIZE];
 connection   *cxtbuffer = NULL;
-static char  *dev,*dpath,*chroot_dir,*output_format;
+static char  *dev,*chroot_dir,*output_format;
+static char  dpath[STDBUF] = "./";
 static char  *group_name, *user_name, *true_pid_name;
 static char  *pidfile = "cxtracker.pid";
 static char  *pidpath = "/var/run";
-static int   verbose, inpacket, intr_flag, use_syslog;
+static int   verbose, inpacket, intr_flag, use_syslog, dump_with_flush;
 static int   mode;
+static char  *read_file;
+
+static uint64_t roll_size;
+static time_t   roll_time;
+static time_t   roll_time_last;
+static int64_t  dump_file_offset = 0;
+static char     *dump_file_prefix;
+static char     dump_file[STDBUF];
+
 ip_config_t  ip_config;
 
 
@@ -69,11 +82,50 @@ void check_interupt();
 void dump_active();
 void set_end_sessions();
 
+
+int dump_file_open();
+int dump_file_roll();
+int dump_file_close();
+
+
+
+
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet) {
    if ( intr_flag != 0 ) { check_interupt(); }
    inpacket = 1;
-   //tstamp = time(NULL);
+
    tstamp = pheader->ts.tv_sec;
+
+   /* are we dumping */
+   if (mode & MODE_DUMP) {
+      time_t now = time(NULL);
+
+      /* check if we should roll on time */
+      if( ( roll_time != 0 ) &&
+          ( now >= (roll_time_last + roll_time) ) )
+      {
+         roll_time_last = now;
+         printf("Rolling on time.\n");
+         dump_file_roll();
+      }
+
+      dump_file_offset = (int64_t)ftell((FILE *)dump_handle);
+
+      /* check if we should roll on size */
+      if ( (roll_size > 0) &&
+           (dump_file_offset >= roll_size) )
+      {
+         printf("Rolling on size.\n");
+         dump_file_roll();
+      }
+
+      /* write the packet */
+      pcap_dump((u_char *)dump_handle, pheader, packet);
+
+      if ( dump_with_flush )
+         pcap_dump_flush(dump_handle);
+   }
+
    u_short p_bytes;
 
    /* printf("[*] Got network packet...\n"); */
@@ -166,8 +218,9 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          return;
       }
       else if (ip6->next == IP6_PROTO_ICMP) {
-         icmp6_header *icmph;
-         icmph = (icmp6_header *) (packet + eth_header_len + IP6_HEADER_LEN);
+         //icmp6_header *icmph;
+         //icmph = (icmp6_header *) (packet + eth_header_len + IP6_HEADER_LEN);
+
          /* printf("[*] IPv6 PROTOCOL TYPE ICMP\n"); */
          cx_track(ip_src, ip6->hop_lmt, ip_dst, ip6->hop_lmt, ip6->next, ip6->len, 0, tstamp, AF_INET6);
          inpacket = 0;
@@ -210,6 +263,18 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
          cxt->s_total_bytes += p_bytes;
          cxt->s_total_pkts  += 1;
          cxt->last_pkt_time  = tstamp;
+
+         if ( mode & MODE_DUMP )
+         {
+            cxt->last_offset = dump_file_offset;
+            snprintf(cxt->last_dump, STDBUF, "%s", dump_file);
+         }
+         else if ( mode & MODE_FILE )
+         {
+            cxt->last_offset = (int64_t)ftell(pcap_file(handle));
+            snprintf(cxt->last_dump, STDBUF, "%s", read_file);
+         }
+
          return;
       }
       else if ( cxt->d_port == src_port && cxt->s_port == dst_port
@@ -220,6 +285,18 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
          cxt->d_total_bytes += p_bytes;
          cxt->d_total_pkts  += 1;
          cxt->last_pkt_time  = tstamp;
+
+         if ( mode & MODE_DUMP )
+         {
+            cxt->last_offset = dump_file_offset;
+            snprintf(cxt->last_dump, STDBUF, "%s", dump_file);
+         }
+         else if ( mode & MODE_FILE )
+         {
+            cxt->last_offset = (int64_t)ftell(pcap_file(handle));
+            snprintf(cxt->last_dump, STDBUF, "%s", read_file);
+         }
+
          return;
       }
       cxt = cxt->next;
@@ -242,10 +319,23 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
       /* cxt->d_total_pkts   = 0; */
       cxt->start_time     = tstamp;
 
-      if ( mode & MODE_FILE )
+      if ( mode & MODE_DUMP )
+      {
+         cxt->start_offset = dump_file_offset;
+         snprintf(cxt->start_dump, STDBUF, "%s", dump_file);
+         cxt->last_offset = dump_file_offset;
+         snprintf(cxt->last_dump, STDBUF, "%s", dump_file);
+      }
+      else if ( mode & MODE_FILE )
+      {
          cxt->start_offset = (int64_t)ftell(pcap_file(handle));
+         cxt->last_offset = cxt->start_offset;
+      }
       else
+      {
          cxt->start_offset = -1;
+         cxt->last_offset = -1;
+      }
 
       cxt->last_pkt_time  = tstamp;
 
@@ -387,7 +477,7 @@ void cxtbuffer_write () {
       FILE *cxtFile;
    char cxtfname[4096];
 
-   sprintf(cxtfname, "%s/stats.%s.%ld", dpath, dev, tstamp);
+   sprintf(cxtfname, "%sstats.%s.%ld", dpath, dev, tstamp);
    cxtFile = fopen(cxtfname, "w");
 
    if (cxtFile == NULL) {
@@ -483,9 +573,53 @@ void dump_active() {
    }
 }
 
+int dump_file_open()
+{
+
+   /* calculate filename */
+   time_t now = time(NULL);
+
+   memset(dump_file, 0, STDBUF);
+
+   if ( dpath != NULL )
+      snprintf(dump_file, STDBUF, "%s%s.%lu", dpath, dump_file_prefix, (long unsigned int) now);
+   else
+      snprintf(dump_file, STDBUF, "%s.%lu", dump_file_prefix, (long unsigned int) now);
+
+   // TODO: check if destination file already exists
+
+
+   if ( (dump_handle=pcap_dump_open(handle, dump_file)) == NULL )
+   {
+      exit(1);
+   }
+
+   return SUCCESS;
+}
+
+int dump_file_roll()
+{
+   dump_file_close();
+   dump_file_open();
+
+   return SUCCESS;
+}
+
+
+int dump_file_close()
+{
+   if ( dump_handle != NULL ) {
+      pcap_dump_flush(dump_handle);
+      pcap_dump_close(dump_handle);
+      dump_handle = NULL;
+   }
+
+   return SUCCESS;
+}
+
+
 static int set_chroot(void) {
    char *absdir;
-   int abslen;
 
    /* logdir = get_abs_path(logpath); */
 
@@ -496,7 +630,6 @@ static int set_chroot(void) {
 
    /* always returns an absolute pathname */
    absdir = getcwd(NULL, 0);
-   abslen = strlen(absdir);
 
    /* make the chroot call */
    if ( chroot(absdir) < 0 ) {
@@ -688,34 +821,38 @@ static void usage(const char *program_name) {
     fprintf(stdout, "USAGE: %s [-options]\n", program_name);
     fprintf(stdout, "\n");
     fprintf(stdout, " General Options:\n");
-    fprintf(stdout, "  -?            You're reading it.\n");
-    fprintf(stdout, "  -v            Verbose output.\n");
+    fprintf(stdout, "  -?             You're reading it.\n");
+    fprintf(stdout, "  -v             Verbose output.\n");
 //    fprintf(stdout, "  -V            Version and compiled in options.\n");
-    fprintf(stdout, "  -i <iface>    Interface to sniff from.\n");
-    fprintf(stdout, "  -f <format>   Output format line. See Format options.\n");
-    fprintf(stdout, "  -b <bfp>      Berkley packet filter.\n");
-    fprintf(stdout, "  -d <dir>      Directory to write session files to.\n");
-    fprintf(stdout, "  -D            Enable daemon mode.\n");
-    fprintf(stdout, "  -u <user>     User to drop priveleges to after daemonising.\n");
-    fprintf(stdout, "  -g <group>    Group to drop priveleges to after daemonising.\n");
-    fprintf(stdout, "  -T <dir>      Direct to chroot into.\n");
-    fprintf(stdout, "  -P <path>     Path to PID file (/var/run).\n");
-    fprintf(stdout, "  -p <file>     Name of pidfile (cxtracker.pid).\n");
-    fprintf(stdout, "  -r <pcap>     PCAP file to read.\n");
+    fprintf(stdout, "  -i <iface>     Interface to sniff from.\n");
+    fprintf(stdout, "  -f <format>    Output format line. See Format options.\n");
+    fprintf(stdout, "  -b <bfp>       Berkley packet filter.\n");
+    fprintf(stdout, "  -d <dir>       Directory to write session files to.\n");
+    fprintf(stdout, "  -D             Enable daemon mode.\n");
+    fprintf(stdout, "  -u <user>      User to drop priveleges to after daemonising.\n");
+    fprintf(stdout, "  -g <group>     Group to drop priveleges to after daemonising.\n");
+    fprintf(stdout, "  -T <dir>       Direct to chroot into.\n");
+    fprintf(stdout, "  -P <path>      Path to PID file (/var/run).\n");
+    fprintf(stdout, "  -p <file>      Name of pidfile (cxtracker.pid).\n");
+    fprintf(stdout, "  -r <pcap>      PCAP file to read.\n");
+    fprintf(stdout, "  -w <name>      Dump PCAP to file with specified prefix.\n");
+    fprintf(stdout, "  -F             Flush output after every write to dump file.\n");
+    fprintf(stdout, "  -s <bytes>     Roll over dump file based on size.\n");
+    fprintf(stdout, "  -t <interval>  Roll over dump file based on time intervals.\n");
     fprintf(stdout, "\n");
     fprintf(stdout, " Long Options:\n");
-    fprintf(stdout, "  --help        Same as '?'\n");
+    fprintf(stdout, "  --help         Same as '?'\n");
 //    fprintf(stdout, "  --version     Same as 'V'\n");
-    fprintf(stdout, "  --interface   Same as 'i'\n");
-    fprintf(stdout, "  --format      Same as 'f'\n");
-    fprintf(stdout, "  --bpf         Same as 'b'\n");
-    fprintf(stdout, "  --log-dir     Same as 'd'\n");
-    fprintf(stdout, "  --daemonize   Same as 'D'\n");
-    fprintf(stdout, "  --user        Same as 'u'\n");
-    fprintf(stdout, "  --group       Same as 'g'\n");
-    fprintf(stdout, "  --chroot-dir  Same as 'T'\n");
-    fprintf(stdout, "  --pid-file    Same as 'p'\n");
-    fprintf(stdout, "  --pcap-file   Same as 'r'\n");
+    fprintf(stdout, "  --interface    Same as 'i'\n");
+    fprintf(stdout, "  --format       Same as 'f'\n");
+    fprintf(stdout, "  --bpf          Same as 'b'\n");
+    fprintf(stdout, "  --log-dir      Same as 'd'\n");
+    fprintf(stdout, "  --daemonize    Same as 'D'\n");
+    fprintf(stdout, "  --user         Same as 'u'\n");
+    fprintf(stdout, "  --group        Same as 'g'\n");
+    fprintf(stdout, "  --chroot-dir   Same as 'T'\n");
+    fprintf(stdout, "  --pid-file     Same as 'p'\n");
+    fprintf(stdout, "  --pcap-file    Same as 'r'\n");
     fprintf(stdout, "\n");
     format_options();
  }
@@ -725,8 +862,12 @@ int main(int argc, char *argv[]) {
    int ch, fromfile, setfilter, version, drop_privs_flag, daemon_flag, chroot_flag;
    struct bpf_program cfilter;
    char *bpff, errbuf[PCAP_ERRBUF_SIZE];
-   const char *pcap_file = NULL;
    extern char *optarg;
+   char roll_metric = 0;
+   char roll_type = GIGABYTES;
+   size_t roll_point = 2;
+   roll_size = roll_point * GIGABYTE;
+
    int long_option_index = 0;
    static struct option long_options[] = {
      {"help", 0, NULL, '?'},
@@ -749,12 +890,10 @@ int main(int argc, char *argv[]) {
    dev = "eth0";
    bpff = "";
    chroot_dir = "/tmp/";
-   dpath = "./";
    output_format = "sguil";
    cxtbuffer = NULL;
    cxtrackerid  = 0;
-   inpacket = intr_flag = chroot_flag = 0;
-   timecnt = time(NULL);
+   dump_with_flush = inpacket = intr_flag = chroot_flag = 0;
    mode = 0;
 
    signal(SIGTERM, game_over);
@@ -763,7 +902,7 @@ int main(int argc, char *argv[]) {
    signal(SIGHUP,  dump_active);
    signal(SIGALRM, set_end_sessions);
 
-   while( (ch=getopt_long(argc, argv, "?b:d:DT:f:g:i:p:P:r:u:v", long_options, &long_option_index)) != EOF )
+   while( (ch=getopt_long(argc, argv, "?b:d:DT:f:g:i:p:P:r:u:vw:s:t:", long_options, &long_option_index)) != EOF )
      switch (ch) {
       case 'i':
          dev = strdup(optarg);
@@ -779,7 +918,11 @@ int main(int argc, char *argv[]) {
          output_format = strdup(optarg);
          break;
       case 'd':
-         dpath = strdup(optarg);
+         snprintf(dpath, STDBUF, "%s", optarg);
+
+         // normalise the directory path to ensure it's slash terminated
+         if( dpath[strlen(dpath)-1] != '/' )
+            strncat(dpath, "/", STDBUF);
          break;
       case '?':
          usage(argv[0]);
@@ -806,8 +949,67 @@ int main(int argc, char *argv[]) {
          pidpath = strdup(optarg);
          break;
       case 'r':
-         pcap_file = strdup(optarg);
+         read_file = strdup(optarg);
          mode |= MODE_FILE;
+         break;
+      case 'w':
+         dump_file_prefix = strdup(optarg);
+         mode |= MODE_DUMP;
+         break;
+      case 'F':
+         dump_with_flush = 1;
+         break;
+      case 's':
+         sscanf(optarg, "%zu%c", &roll_point, &roll_metric);
+
+         switch( tolower(roll_metric) ) {
+            case 'k':
+               roll_size = roll_point * KILOBYTE;
+               roll_type = KILOBYTES;
+               break;
+            case 'm':
+               roll_size = roll_point * MEGABYTE;
+               roll_type = MEGABYTES;
+               break;
+            case 'g':
+               roll_size = roll_point * GIGABYTE;
+               roll_type = GIGABYTES;
+               break;
+            case 't':
+               roll_size = roll_point * TERABYTE;
+               roll_type = TERABYTES;
+               break;
+            default:
+               printf("[*] Invalid size metric: %c\n", roll_metric ? roll_metric : '-');
+               break;
+         }
+
+         break;
+      case 't':
+         sscanf(optarg, "%zu%c", &roll_point, &roll_metric);
+
+         switch( tolower(roll_metric) ) {
+            case 's':
+               roll_time = roll_point;
+               roll_type = SECONDS;
+               break;
+            case 'm':
+               roll_time = roll_point * 60;
+               roll_type = MINUTES;
+               break;
+            case 'h':
+               roll_time = roll_point * 60 * 60;
+               roll_type = HOURS;
+               break;
+            case 'd':
+               roll_time = roll_point * 60 * 60 * 24;
+               roll_type = DAYS;
+               break;
+            default:
+               printf("[*] Invalid size metric: %c\n", roll_metric ? roll_metric : '-');
+               break;
+         }
+
          break;
       default:
          exit(1);
@@ -826,12 +1028,13 @@ int main(int argc, char *argv[]) {
       usage(argv[0]);
       exit(1);
    }
-   else if ( (mode & MODE_FILE) && pcap_file) {
+   else if ( (mode & MODE_FILE) && read_file) {
       /* Read from PCAP file specified by '-r' switch. */
-      printf("[*] Reading from file %s", pcap_file);
-      if (!(handle = pcap_open_offline(pcap_file, errbuf))) {
+      printf("[*] Reading from file %s", read_file);
+      if (!(handle = pcap_open_offline(read_file, errbuf))) {
          printf("\n");
-         printf("[*] Unable to open %s. (%s)", pcap_file, errbuf);
+         printf("[*] Unable to open %s. (%s)\n", read_file, errbuf);
+         exit(1);
       } else {
          printf(" - OK\n");
       }
@@ -907,6 +1110,13 @@ int main(int argc, char *argv[]) {
       pcap_freecode(&cfilter); // filter code not needed after setfilter
    }
 
+   // set up dump mode now as appropriate
+   if (mode & MODE_DUMP ) {
+      printf("[*] Writing traffic to %s%s.*, rolling every %d %s\n",
+          dpath, dump_file_prefix, (int)roll_point, rollover_names[(int)roll_type]);
+      dump_file_open();
+   }
+
    /* B0rk if we see an error... */
    if (strlen(errbuf) > 0) {
       printf("[*] Error errbuf: %s \n", errbuf);
@@ -918,14 +1128,17 @@ int main(int argc, char *argv[]) {
       printf("[*] Dropping privs...\n\n");
       drop_privs();
    }
+
    bucket_keys_NULL();
 
    alarm(TIMEOUT);
-   if (pcap_file) {
-      printf("[*] Reading packets...\n\n");
+   if (read_file) {
+      printf("[*] Reading packets...\n");
    } else {
-      printf("[*] Sniffing...\n\n");
+      printf("[*] Sniffing...\n");
    }
+
+   roll_time_last = time(NULL);
    pcap_loop(handle,-1,got_packet,NULL);
 
    game_over();

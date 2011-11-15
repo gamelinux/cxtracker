@@ -58,7 +58,9 @@ void format_write_bytes_source(FILE *fd, const connection *cxt, const char *pref
 void format_write_bytes_destination(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_tcp_flags_source(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_tcp_flags_destination(FILE *fd, const connection *cxt, const char *prefix);
+void format_write_pcap_file_start(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_pcap_offset_start(FILE *fd, const connection *cxt, const char *prefix);
+void format_write_pcap_file_end(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_pcap_offset_end(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_custom(FILE *fd, const connection *cxt, const char *prefix);
 
@@ -87,8 +89,10 @@ void format_options()
     fprintf(stdout, "  %%dby          total bytes send from the destination IP during the session\n");
     fprintf(stdout, "  %%sfl          cumulative source IP TCP flags sent during the session\n");
     fprintf(stdout, "  %%dfl          cumulative destination IP TCP flags sent during the session\n");
+    fprintf(stdout, "  %%spf          pcap file containing start packet in session\n");
     fprintf(stdout, "  %%spo          pcap file offset of start packet in session\n");
-    fprintf(stdout, "  %%epo          pcap file offset of first byte after last packet in session\n");
+    fprintf(stdout, "  %%epf          pcap file containing last packet in session\n");
+    fprintf(stdout, "  %%epo          pcap file offset of flast packet in session\n");
     fprintf(stdout, "\n");
     fprintf(stdout, " Format Meta-Options:\n");
     fprintf(stdout, "  sguil          Formatted output compatible with sguil\n");
@@ -114,7 +118,7 @@ void format_validate(const char *format)
     if ( strncmp(format, "sguil", 5) == 0 || strncmp(format, "openfpc", 5) == 0 )
         format_qualified = strdup("%cxd|%stm|%etm|%dur|%pro|%sin|%spt|%din|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl");
     else if ( strncmp(format, "nsmf", 5) == 0 )
-        format_qualified = strdup("%cxd|%stm|%etm|%dur|%pro|%sip|%spt|%dip|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl");
+        format_qualified = strdup("%cxd|%stm|%etm|%dur|%pro|%sip|%spt|%dip|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl|%spf|%spo|%epf|%epo");
     else
         format_qualified = strdup(format);
 
@@ -247,10 +251,20 @@ void format_validate(const char *format)
                 match = 4;
                 func = (void *)&format_write_tcp_flags_destination;
             }
+            else if ( strncmp(fp_e, "%spf", 4) == 0 )
+            {
+                match = 4;
+                func = (void *)&format_write_pcap_file_start;
+            }
             else if ( strncmp(fp_e, "%spo", 4) == 0 )
             {
                 match = 4;
                 func = (void *)&format_write_pcap_offset_start;
+            }
+            else if ( strncmp(fp_e, "%epf", 4) == 0 )
+            {
+                match = 4;
+                func = (void *)&format_write_pcap_file_end;
             }
             else if ( strncmp(fp_e, "%epo", 4) == 0 )
             {
@@ -522,9 +536,19 @@ void format_write_pcap_offset_start(FILE *fd, const connection *cxt, const char 
     fprintf(fd, "%s%lld", prefix, (long long int)cxt->start_offset);
 }
 
+void format_write_pcap_file_start(FILE *fd, const connection *cxt, const char *prefix)
+{
+    fprintf(fd, "%s%s", prefix, cxt->start_dump);
+}
+
 void format_write_pcap_offset_end(FILE *fd, const connection *cxt, const char *prefix)
 {
-    fprintf(fd, "%s%lld", prefix, (long long int)cxt->start_offset);
+    fprintf(fd, "%s%lld", prefix, (long long int)cxt->last_offset);
+}
+
+void format_write_pcap_file_end(FILE *fd, const connection *cxt, const char *prefix)
+{
+    fprintf(fd, "%s%s", prefix, cxt->last_dump);
 }
 
 void format_write_custom(FILE *fd, const connection *cxt, const char *prefix)
