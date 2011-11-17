@@ -56,8 +56,8 @@ use Getopt::Long qw/:config auto_version auto_help/;
 
 =cut
 
-my $DEBUG             = 1;
-my $VERBOSE           = 1;
+my $DEBUG             = 0;
+my $VERBOSE           = 0;
 
 my ($R_PCAP, $W_PCAP, $BPF, $BS, $BE, $FH_PCAP) = qq();
 my ($SRC_IP, $DST_IP, $SRC_PORT, $DST_PORT, $PROTO) = qq();
