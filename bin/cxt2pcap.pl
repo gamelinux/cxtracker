@@ -80,7 +80,7 @@ Getopt::Long::GetOptions(
     'd|debug'                => \$DEBUG,
 );
 
-print "[*] cxt2pcap starting...\n" if ($VERBOSE||$DEBUG);
+print "[*] cxt2pcap starting...\n";
 
 if ( -e $R_PCAP ) {
    print "[*] Opening $R_PCAP\n" if ($VERBOSE||$DEBUG);
@@ -90,16 +90,16 @@ if ( -e $R_PCAP ) {
    read(RFILE,$FH_PCAP,24);
 }
 
-if( ! -f $W_PCAP || ! -s $W_PCAP ){
+#if( ! -f $W_PCAP || ! -s $W_PCAP ){
    print "[*] Opening > $W_PCAP\n" if ($VERBOSE||$DEBUG);
    open(WFILE,">$W_PCAP") || die ("[E] Unable to open file $W_PCAP");
    binmode WFILE;
-}else{
+#}else{
    #print "Opening >> $W_PCAP\n" if ($VERBOSE||$DEBUG);
    #open(WFILE,">>$W_PCAP") || die("[E] Unable to open file $W_PCAP");
    #binmode WFILE;
-   die("[E] Unable to open file $W_PCAP");
-}
+   #die("[E] Unable to open file $W_PCAP");
+#}
 
 # SET
 seek(RFILE,$BS,SEEK_SET);
@@ -123,7 +123,7 @@ while (!eof(RFILE)) {
      last;
   }
   my $tproto = unpack("C", substr($PKTBUFFER, 23,1));
-  print "$tproto\n";
+  print "[*] Processing a packet with protocol nr: $tproto\n";
   if ($tproto == 6 && $PROTO == 6) {
      $BUFFER .= "$pktHdr$PKTBUFFER" if processTCPPkt($PKTBUFFER);
   } elsif ($tproto == 17 && $PROTO == 17) {
@@ -141,7 +141,7 @@ print "[*] " . tell RFILE; print " > $BE\n" if ($VERBOSE||$DEBUG);
 
 # WRITE
 my $BUFFLENGTH=length($BUFFER);
-print "[D] Writing session to $W_PCAP ($BUFFLENGTH Bytes)\n" if ($VERBOSE||$DEBUG);
+print "[D] Writing session to $W_PCAP ($BUFFLENGTH Bytes)\n";
 syswrite(WFILE,"$FH_PCAP",24);
 syswrite(WFILE,$BUFFER,$BUFFLENGTH) || die ("[E] Failed to write session to $W_PCAP!");
 
@@ -168,7 +168,7 @@ sub processTCPPkt {
    my $srcport  = substr($pktBuf, 34,2);
    my $dstport  = substr($pktBuf, 36,2);
    my $binstr = "$srcip$srcport$dstip$dstport";
-   printSession ($binstr);
+   printSession ($binstr) if ($DEBUG || $VERBOSE);
    my @B = unpack("C*", $binstr);
    $srcip = "$B[0].$B[1].$B[2].$B[3]";
    $dstip = "$B[6].$B[7].$B[8].$B[9]";
@@ -210,6 +210,6 @@ sub processICMPPkt {
 sub printSession {
    my $session = shift;
    my @B = unpack("C*", $session);
-   printf "%d.%d.%d.%d:%d --> %d.%d.%d.%d:%d\n",
+   printf "[Session] %d.%d.%d.%d:%d --> %d.%d.%d.%d:%d\n",
       $B[0], $B[1],$B[2],$B[3], $B[4]*256+$B[5], $B[6],$B[7],$B[8],$B[9], $B[10]*256+$B[11];
 }
