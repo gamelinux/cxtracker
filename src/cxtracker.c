@@ -266,7 +266,7 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
 
          if ( mode & MODE_DUMP )
          {
-            cxt->last_offset = dump_file_offset;
+            cxt->last_offset = (int64_t)ftell((FILE *)dump_handle);
             snprintf(cxt->last_dump, STDBUF, "%s", dump_file);
          }
          else if ( mode & MODE_FILE )
@@ -288,7 +288,7 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
 
          if ( mode & MODE_DUMP )
          {
-            cxt->last_offset = dump_file_offset;
+            cxt->last_offset = (int64_t)ftell((FILE *)dump_handle);
             snprintf(cxt->last_dump, STDBUF, "%s", dump_file);
          }
          else if ( mode & MODE_FILE )
@@ -321,9 +321,8 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
 
       if ( mode & MODE_DUMP )
       {
-         cxt->start_offset = dump_file_offset;
+         cxt->start_offset = cxt->last_offset = dump_file_offset;
          snprintf(cxt->start_dump, STDBUF, "%s", dump_file);
-         cxt->last_offset = dump_file_offset;
          snprintf(cxt->last_dump, STDBUF, "%s", dump_file);
       }
       else if ( mode & MODE_FILE )
