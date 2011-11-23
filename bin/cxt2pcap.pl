@@ -56,8 +56,8 @@ use Getopt::Long qw/:config auto_version auto_help/;
 
 =cut
 
-my $DEBUG             = 1;
-my $VERBOSE           = 1;
+my $DEBUG             = 0;
+my $VERBOSE           = 0;
 
 my ($R_PCAP, $W_PCAP, $BPF, $BS, $BE, $FH_PCAP) = qq();
 my ($SRC_IP, $DST_IP, $SRC_PORT, $DST_PORT, $PROTO) = qq();
@@ -123,7 +123,7 @@ while (!eof(RFILE)) {
      last;
   }
   my $tproto = unpack("C", substr($PKTBUFFER, 23,1));
-  print "[*] Processing a packet with protocol nr: $tproto\n";
+  print "[*] Processing a packet with protocol nr: $tproto\n" if $VERBOSE;
   if ($tproto == 6 && $PROTO == 6) {
      $BUFFER .= "$pktHdr$PKTBUFFER" if processTCPPkt($PKTBUFFER);
   } elsif ($tproto == 17 && $PROTO == 17) {
@@ -137,13 +137,19 @@ while (!eof(RFILE)) {
   }
 }
 
-print "[*] " . tell RFILE; print " > $BE\n" if ($VERBOSE||$DEBUG);
+print "[*] " . tell RFILE if ($VERBOSE||$DEBUG);
+print " > $BE\n" if ($VERBOSE||$DEBUG);
 
 # WRITE
 my $BUFFLENGTH=length($BUFFER);
-print "[D] Writing session to $W_PCAP ($BUFFLENGTH Bytes)\n";
-syswrite(WFILE,"$FH_PCAP",24);
-syswrite(WFILE,$BUFFER,$BUFFLENGTH) || die ("[E] Failed to write session to $W_PCAP!");
+print "[D] Writing pcap-file-header to $W_PCAP\n" if $DEBUG;
+syswrite(WFILE,"$FH_PCAP",24) || die ("[E] Failed to write pcap-file-header to $W_PCAP");
+print "[D] Writing session to $W_PCAP ($BUFFLENGTH Bytes)\n" if $DEBUG;
+if ($BUFFLENGTH ne 0) {
+   syswrite(WFILE,$BUFFER,$BUFFLENGTH) || die ("[E] Failed to write session to $W_PCAP");
+} else {
+   print "[*] No session data found!\n";
+}
 
 # END
 close(RFILE);
@@ -176,7 +182,7 @@ sub processTCPPkt {
    $dstport = $B[10]*256+$B[11];
    if (( $srcip eq $SRC_IP && $dstip eq $DST_IP ) || ( $srcip eq $DST_IP && $dstip eq $SRC_IP )) {
       if (( $srcport eq $SRC_PORT && $dstport eq $DST_PORT ) || ( $srcport eq $DST_PORT && $dstport eq $SRC_PORT )) {
-         print "[D] Got matching TCP packet\n" if $DEBUG;
+         print "[D] Got matching TCP packet\n" if $VERBOSE;
          return 1;
       }
    }
@@ -188,6 +194,7 @@ sub processUDPPkt {
    my $pktBuf   = shift;
    my $srcip    = substr($pktBuf, 26,4);
    my $dstip    = substr($pktBuf, 30,4);
+   # Need to implement src/dst port
 
    if (( $srcip eq $SRC_IP && $dstip eq $DST_IP ) || ( $srcip eq $DST_IP && $dstip eq $SRC_IP )) {
       return 1;
