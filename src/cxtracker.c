@@ -60,6 +60,7 @@ static char  *pidpath = "/var/run";
 static int   verbose, inpacket, intr_flag, use_syslog, dump_with_flush;
 static int   mode;
 static char  *read_file;
+static int64_t  read_file_offset = 0;
 
 static uint64_t roll_size;
 static time_t   roll_time;
@@ -73,7 +74,7 @@ ip_config_t  ip_config;
 
 /*  I N T E R N A L   P R O T O T Y P E S  ************************************/
 void move_connection (connection*, connection**);
-inline void cx_track(ip_t ip_src, uint16_t src_port, ip_t ip_dst, uint16_t dst_port,uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af);
+inline void cx_track(ip_t ip_src, uint16_t src_port, ip_t ip_dst, uint16_t dst_port,uint8_t ip_proto,uint32_t p_bytes,uint8_t tcpflags,time_t tstamp, int af);
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet);
 void end_sessions();
 void cxtbuffer_write();
@@ -125,8 +126,9 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
       if ( dump_with_flush )
          pcap_dump_flush(dump_handle);
    }
-
-   u_short p_bytes;
+   else if ( mode & MODE_FILE ) {
+      read_file_offset = (int64_t)ftell(pcap_file(handle)) - pheader->caplen - 16;
+   }
 
    /* printf("[*] Got network packet...\n"); */
    ether_header *eth_hdr;
@@ -156,7 +158,6 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
       /* printf("[*] Got IPv4 Packet...\n"); */
       ip4_header *ip4;
       ip4 = (ip4_header *) (packet + eth_header_len);
-      p_bytes = (ip4->ip_len - (IP_HL(ip4)*4));
 
       ip_set(&ip_config, &ip_src, &ip4->ip_src, AF_INET);
       ip_set(&ip_config, &ip_dst, &ip4->ip_dst, AF_INET);
@@ -165,7 +166,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          tcp_header *tcph;
          tcph = (tcp_header *) (packet + eth_header_len + (IP_HL(ip4)*4));
          /* printf("[*] IPv4 PROTOCOL TYPE TCP:\n"); */
-         cx_track(ip_src, tcph->src_port, ip_dst, tcph->dst_port, ip4->ip_p, p_bytes, tcph->t_flags, tstamp, AF_INET);
+         cx_track(ip_src, tcph->src_port, ip_dst, tcph->dst_port, ip4->ip_p, pheader->len, tcph->t_flags, tstamp, AF_INET);
          inpacket = 0;
          return;
       }
@@ -173,7 +174,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          udp_header *udph;
          udph = (udp_header *) (packet + eth_header_len + (IP_HL(ip4)*4));
          /* printf("[*] IPv4 PROTOCOL TYPE UDP:\n"); */
-         cx_track(ip_src, udph->src_port, ip_dst, udph->dst_port, ip4->ip_p, p_bytes, 0, tstamp, AF_INET);
+         cx_track(ip_src, udph->src_port, ip_dst, udph->dst_port, ip4->ip_p, pheader->len, 0, tstamp, AF_INET);
          inpacket = 0;
          return;
       }
@@ -181,13 +182,13 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          icmp_header *icmph;
          icmph = (icmp_header *) (packet + eth_header_len + (IP_HL(ip4)*4));
          /* printf("[*] IP PROTOCOL TYPE ICMP\n"); */
-         cx_track(ip_src, icmph->s_icmp_id, ip_dst, icmph->s_icmp_id, ip4->ip_p, p_bytes, 0, tstamp, AF_INET);
+         cx_track(ip_src, icmph->s_icmp_id, ip_dst, icmph->s_icmp_id, ip4->ip_p, pheader->len, 0, tstamp, AF_INET);
          inpacket = 0;
          return;
       }
       else {
          /* printf("[*] IPv4 PROTOCOL TYPE OTHER: %d\n",ip4->ip_p); */
-         cx_track(ip_src, ip4->ip_p, ip_dst, ip4->ip_p, ip4->ip_p, p_bytes, 0, tstamp, AF_INET);
+         cx_track(ip_src, ip4->ip_p, ip_dst, ip4->ip_p, ip4->ip_p, pheader->len, 0, tstamp, AF_INET);
          inpacket = 0;
          return;
       }
@@ -205,7 +206,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          tcp_header *tcph;
          tcph = (tcp_header *) (packet + eth_header_len + IP6_HEADER_LEN);
          /* printf("[*] IPv6 PROTOCOL TYPE TCP:\n"); */
-         cx_track(ip_src, tcph->src_port, ip_dst, tcph->dst_port, ip6->next, ip6->len, tcph->t_flags, tstamp, AF_INET6);
+         cx_track(ip_src, tcph->src_port, ip_dst, tcph->dst_port, ip6->next, pheader->len, tcph->t_flags, tstamp, AF_INET6);
          inpacket = 0;
          return;
       }
@@ -213,7 +214,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          udp_header *udph;
          udph = (udp_header *) (packet + eth_header_len + IP6_HEADER_LEN);
          /* printf("[*] IPv6 PROTOCOL TYPE UDP:\n"); */
-         cx_track(ip_src, udph->src_port, ip_dst, udph->dst_port, ip6->next, ip6->len, 0, tstamp, AF_INET6);
+         cx_track(ip_src, udph->src_port, ip_dst, udph->dst_port, ip6->next, pheader->len, 0, tstamp, AF_INET6);
          inpacket = 0;
          return;
       }
@@ -222,13 +223,13 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          //icmph = (icmp6_header *) (packet + eth_header_len + IP6_HEADER_LEN);
 
          /* printf("[*] IPv6 PROTOCOL TYPE ICMP\n"); */
-         cx_track(ip_src, ip6->hop_lmt, ip_dst, ip6->hop_lmt, ip6->next, ip6->len, 0, tstamp, AF_INET6);
+         cx_track(ip_src, ip6->hop_lmt, ip_dst, ip6->hop_lmt, ip6->next, pheader->len, 0, tstamp, AF_INET6);
          inpacket = 0;
          return;
       }
       else {
          /* printf("[*] IPv6 PROTOCOL TYPE OTHER: %d\n",ip6->next); */
-         cx_track(ip_src, ip6->next, ip_dst, ip6->next, ip6->next, ip6->len, 0, tstamp, AF_INET6);
+         cx_track(ip_src, ip6->next, ip_dst, ip6->next, ip6->next, pheader->len, 0, tstamp, AF_INET6);
          inpacket = 0;
          return;
       }
@@ -243,7 +244,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
 
 inline
 void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
-               uint8_t ip_proto,uint16_t p_bytes,uint8_t tcpflags,time_t tstamp, int af) {
+               uint8_t ip_proto, uint32_t p_bytes, uint8_t tcpflags,time_t tstamp, int af) {
 
    connection *cxt = NULL;
    connection *head = NULL;
@@ -266,12 +267,12 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
 
          if ( mode & MODE_DUMP )
          {
-            cxt->last_offset = (int64_t)ftell((FILE *)dump_handle);
+            cxt->last_offset = dump_file_offset + p_bytes;
             snprintf(cxt->last_dump, STDBUF, "%s", dump_file);
          }
          else if ( mode & MODE_FILE )
          {
-            cxt->last_offset = (int64_t)ftell(pcap_file(handle));
+            cxt->last_offset = read_file_offset + p_bytes;
             snprintf(cxt->last_dump, STDBUF, "%s", read_file);
          }
 
@@ -288,12 +289,12 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
 
          if ( mode & MODE_DUMP )
          {
-            cxt->last_offset = (int64_t)ftell((FILE *)dump_handle);
+            cxt->last_offset = dump_file_offset + p_bytes;
             snprintf(cxt->last_dump, STDBUF, "%s", dump_file);
          }
          else if ( mode & MODE_FILE )
          {
-            cxt->last_offset = (int64_t)ftell(pcap_file(handle));
+            cxt->last_offset = read_file_offset + p_bytes;
             snprintf(cxt->last_dump, STDBUF, "%s", read_file);
          }
 
@@ -321,14 +322,17 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
 
       if ( mode & MODE_DUMP )
       {
-         cxt->start_offset = cxt->last_offset = dump_file_offset;
+         cxt->start_offset = dump_file_offset;
+         cxt->last_offset = cxt->start_offset + p_bytes;
          snprintf(cxt->start_dump, STDBUF, "%s", dump_file);
          snprintf(cxt->last_dump, STDBUF, "%s", dump_file);
       }
       else if ( mode & MODE_FILE )
       {
-         cxt->start_offset = (int64_t)ftell(pcap_file(handle));
-         cxt->last_offset = cxt->start_offset;
+         cxt->start_offset = read_file_offset;
+         cxt->last_offset = cxt->start_offset + p_bytes;
+         snprintf(cxt->start_dump, STDBUF, "%s", read_file);
+         snprintf(cxt->last_dump, STDBUF, "%s", read_file);
       }
       else
       {
@@ -1071,13 +1075,13 @@ int main(int argc, char *argv[]) {
       // in pcap_open_live(), libpcap maintains a heap allocated buffer
       // for reading off the wire. we can use pointer copies here for 
       // improved speed
-      if ( ip_init(&ip_config, IP_SET_POINTER_COPY) )
+      if ( ip_init(&ip_config, IP_SET_MEMCPY) )
       {
         printf("[*] Unable to initialise the IP library.\n");
         exit(1);
       }
       else
-        printf("[*] IP library using \"pointer copy\" set.\n");
+        printf("[*] IP library using \"memcpy\" set.\n");
 
       if ( chroot_flag == 1 ) {
          set_chroot();
