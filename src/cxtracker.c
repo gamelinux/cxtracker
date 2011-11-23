@@ -267,12 +267,12 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
 
          if ( mode & MODE_DUMP )
          {
-            cxt->last_offset = (int64_t)ftell((FILE *)dump_handle);
+            cxt->last_offset = dump_file_offset + p_bytes;
             snprintf(cxt->last_dump, STDBUF, "%s", dump_file);
          }
          else if ( mode & MODE_FILE )
          {
-            cxt->last_offset = (int64_t)ftell(pcap_file(handle));
+            cxt->last_offset = read_file_offset + p_bytes;
             snprintf(cxt->last_dump, STDBUF, "%s", read_file);
          }
 
@@ -289,12 +289,12 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
 
          if ( mode & MODE_DUMP )
          {
-            cxt->last_offset = (int64_t)ftell((FILE *)dump_handle);
+            cxt->last_offset = dump_file_offset + p_bytes;
             snprintf(cxt->last_dump, STDBUF, "%s", dump_file);
          }
          else if ( mode & MODE_FILE )
          {
-            cxt->last_offset = (int64_t)ftell(pcap_file(handle));
+            cxt->last_offset = read_file_offset + p_bytes;
             snprintf(cxt->last_dump, STDBUF, "%s", read_file);
          }
 
