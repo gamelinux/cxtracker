@@ -194,10 +194,14 @@ sub processUDPPkt {
    my $pktBuf   = shift;
    my $srcip    = substr($pktBuf, 26,4);
    my $dstip    = substr($pktBuf, 30,4);
-   # Need to implement src/dst port
+   my $srcport  = substr($pktBuf, 34,2);
+   my $dstport  = substr($pktBuf, 36,2);
 
    if (( $srcip eq $SRC_IP && $dstip eq $DST_IP ) || ( $srcip eq $DST_IP && $dstip eq $SRC_IP )) {
-      return 1;
+      if (( $srcport eq $SRC_PORT && $dstport eq $DST_PORT ) || ( $srcport eq $DST_PORT && $dstport eq $SRC_PORT )) {
+         print "[D] Got matching UDP packet\n" if $VERBOSE;
+         return 1;
+      }
    }
    return 0;
 }
