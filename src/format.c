@@ -92,7 +92,7 @@ void format_options()
     fprintf(stdout, "  %%spf          pcap file containing start packet in session\n");
     fprintf(stdout, "  %%spo          pcap file offset of start packet in session\n");
     fprintf(stdout, "  %%epf          pcap file containing last packet in session\n");
-    fprintf(stdout, "  %%epo          pcap file offset of flast packet in session\n");
+    fprintf(stdout, "  %%epo          pcap file offset of last packet in session\n");
     fprintf(stdout, "\n");
     fprintf(stdout, " Format Meta-Options:\n");
     fprintf(stdout, "  sguil          Formatted output compatible with sguil\n");
