@@ -68,6 +68,9 @@ static time_t   roll_time_last;
 static int64_t  dump_file_offset = 0;
 static char     *dump_file_prefix;
 static char     dump_file[STDBUF];
+//uint64_t        max_cxt   = 0;
+//uint64_t        cxt_alloc = 0;
+//uint64_t        cxt_free  = 0;
 
 ip_config_t  ip_config;
 
@@ -306,6 +309,7 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
    if ( cxt == NULL ) {
       cxtrackerid += 1;
       cxt = (connection*) calloc(1, sizeof(connection));
+      //cxt_alloc++;
       if (head != NULL ) {
          head->prev = cxt;
       }
@@ -492,6 +496,8 @@ void cxtbuffer_write () {
          format_write(cxtFile, cxtbuffer);
 
          next = cxtbuffer->next;
+         free(cxtbuffer);
+         //cxt_free++;
          cxtbuffer=NULL;
          cxtbuffer = next;
       }
@@ -517,7 +523,7 @@ void end_all_sessions() {
          }
       }
    }
-   /* printf("Expired: %d.\n",expired); */
+   //printf("Expired: %d.\n",expired);
 }
 
 void bucket_keys_NULL() {
@@ -558,9 +564,9 @@ void game_over() {
       end_all_sessions();
       cxtbuffer_write();
       pcap_close(handle);
-
       format_clear();
-
+      //printf("    cxt_alloc: %lu\n",cxt_alloc);
+      //printf("    cxt_free : %lu\n",cxt_free);
       exit(0);
    }
    intr_flag = 1;
