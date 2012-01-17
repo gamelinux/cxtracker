@@ -142,15 +142,19 @@ while (!eof(RFILE)) {
   }
 }
 
-print "[*] " . tell RFILE if $DEBUG; 
-print " > $BE\n" if $DEBUG;
+print "[*] " . tell RFILE if ($VERBOSE||$DEBUG);
+print " > $BE\n" if ($VERBOSE||$DEBUG);
 
 # WRITE
 my $BUFFLENGTH=length($BUFFER);
-print "[*] Writing session to $W_PCAP ($BUFFLENGTH Bytes)\n";
-syswrite(WFILE,"$FH_PCAP",24);
-syswrite(WFILE,$BUFFER,$BUFFLENGTH) || die ("[E] Failed to write session to $W_PCAP!");
-print "[*] Done...\n";
+print "[D] Writing pcap-file-header to $W_PCAP\n" if $DEBUG;
+syswrite(WFILE,"$FH_PCAP",24) || die ("[E] Failed to write pcap-file-header to $W_PCAP");
+print "[D] Writing session to $W_PCAP ($BUFFLENGTH Bytes)\n" if $DEBUG;
+if ($BUFFLENGTH ne 0) {
+   syswrite(WFILE,$BUFFER,$BUFFLENGTH) || die ("[E] Failed to write session to $W_PCAP");
+} else {
+   print "[*] No session data found!\n";
+}
 
 # END
 close(RFILE);
@@ -183,7 +187,7 @@ sub processTCPPkt {
    $dstport = $B[10]*256+$B[11];
    if (( $srcip eq $SRC_IP && $dstip eq $DST_IP ) || ( $srcip eq $DST_IP && $dstip eq $SRC_IP )) {
       if (( $srcport eq $SRC_PORT && $dstport eq $DST_PORT ) || ( $srcport eq $DST_PORT && $dstport eq $SRC_PORT )) {
-         print "[D] Got matching TCP packet\n" if $DEBUG;
+         print "[D] Got matching TCP packet\n" if $VERBOSE;
          return 1;
       }
    }
@@ -195,9 +199,14 @@ sub processUDPPkt {
    my $pktBuf   = shift;
    my $srcip    = substr($pktBuf, 26,4);
    my $dstip    = substr($pktBuf, 30,4);
+   my $srcport  = substr($pktBuf, 34,2);
+   my $dstport  = substr($pktBuf, 36,2);
 
    if (( $srcip eq $SRC_IP && $dstip eq $DST_IP ) || ( $srcip eq $DST_IP && $dstip eq $SRC_IP )) {
-      return 1;
+      if (( $srcport eq $SRC_PORT && $dstport eq $DST_PORT ) || ( $srcport eq $DST_PORT && $dstport eq $SRC_PORT )) {
+         print "[D] Got matching UDP packet\n" if $VERBOSE;
+         return 1;
+      }
    }
    return 0;
 }
