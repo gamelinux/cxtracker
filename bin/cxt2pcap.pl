@@ -60,7 +60,8 @@ my $DEBUG             = 0;
 my $VERBOSE           = 0;
 
 my ($R_PCAP, $W_PCAP, $BPF, $BS, $BE, $FH_PCAP) = qq();
-my ($SRC_IP, $DST_IP, $SRC_PORT, $DST_PORT, $PROTO) = qq();
+my ($SRC_IP, $DST_IP, $SRC_PORT, $DST_PORT, $PROTO) = qq(any);
+
 use constant SEEK_SET  => 0;
 use constant SEEK_CUR  => 1;
 use constant SEEK_END  => 2;
@@ -122,13 +123,17 @@ while (!eof(RFILE)) {
      print "[W] Failed to read pkt data: $capturedPktLen/$rl:$!\n";
      last;
   }
+
+  # Check eth_header
+  # ** VLAN ?
+  # If IP - Check proto
   my $tproto = unpack("C", substr($PKTBUFFER, 23,1));
-  print "[*] Processing a packet with protocol nr: $tproto\n";
-  if ($tproto == 6 && $PROTO == 6) {
+  print "[*] Processing a packet with protocol nr: $tproto\n" if $DEBUG;
+  if ($tproto == 6 && ($PROTO == 6 || $PROTO == "any")) {
      $BUFFER .= "$pktHdr$PKTBUFFER" if processTCPPkt($PKTBUFFER);
-  } elsif ($tproto == 17 && $PROTO == 17) {
+  } elsif ($tproto == 17 && ($PROTO == 17 || $PROTO == "any")) {
      $BUFFER .= $pktHdr . $PKTBUFFER if processUDPPkt($PKTBUFFER);
-  } elsif ($tproto == 1 && $PROTO == 1) {
+  } elsif ($tproto == 1 && ($PROTO == 1 || $PROTO == "any")) {
      $BUFFER .= $pktHdr . $PKTBUFFER if processICMPPkt($PKTBUFFER);
   }
   if (tell RFILE > $BE) {
@@ -137,13 +142,15 @@ while (!eof(RFILE)) {
   }
 }
 
-print "[*] " . tell RFILE; print " > $BE\n" if ($VERBOSE||$DEBUG);
+print "[*] " . tell RFILE if $DEBUG; 
+print " > $BE\n" if $DEBUG;
 
 # WRITE
 my $BUFFLENGTH=length($BUFFER);
-print "[D] Writing session to $W_PCAP ($BUFFLENGTH Bytes)\n";
+print "[*] Writing session to $W_PCAP ($BUFFLENGTH Bytes)\n";
 syswrite(WFILE,"$FH_PCAP",24);
 syswrite(WFILE,$BUFFER,$BUFFLENGTH) || die ("[E] Failed to write session to $W_PCAP!");
+print "[*] Done...\n";
 
 # END
 close(RFILE);

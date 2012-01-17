@@ -477,7 +477,7 @@ void cxtbuffer_write () {
    if ( cxtbuffer == NULL ) { return; }
    connection *next;
    next = NULL;
-      FILE *cxtFile;
+   FILE *cxtFile;
    char cxtfname[4096];
 
    sprintf(cxtfname, "%sstats.%s.%ld", dpath, dev, tstamp);
