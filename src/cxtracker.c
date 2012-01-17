@@ -488,7 +488,16 @@ void cxtbuffer_write () {
    cxtFile = fopen(cxtfname, "w");
 
    if (cxtFile == NULL) {
-      printf("[*] ERROR: Cant open file %s\n",cxtfname);
+      printf("[E] ERROR: Cant open file %s\n",cxtfname);
+      /* Free them anyways! */
+      while ( cxtbuffer != NULL ) {
+         next = cxtbuffer->next;
+         free(cxtbuffer);
+         //cxt_free++;
+         cxtbuffer = NULL;
+         cxtbuffer = next;
+      }
+      printf("[W] connections went to visit /dev/null\n");
    }
    else {
 
@@ -498,7 +507,7 @@ void cxtbuffer_write () {
          next = cxtbuffer->next;
          free(cxtbuffer);
          //cxt_free++;
-         cxtbuffer=NULL;
+         cxtbuffer = NULL;
          cxtbuffer = next;
       }
       fclose(cxtFile);
