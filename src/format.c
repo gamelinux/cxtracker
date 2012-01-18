@@ -281,7 +281,7 @@ void format_validate(const char *format)
             // check if we have prefix
             if ( fp_e > fp_s )
             {
-                prefix = malloc(sizeof(char) * (fp_e - fp_s + 1));
+                prefix = calloc(1, sizeof(char) * (fp_e - fp_s + 1));
                 if ( NULL == prefix )
                 {
                     fprintf(stderr, "FATAL: Unable to allocate memory for the custom formatter!\n");
@@ -331,7 +331,7 @@ void format_function_append(format_t **head, void (*func)(FILE *, const struct _
     format_t *iter = *head;
     format_t *item;
 
-    item = malloc(sizeof(format_t));
+    item = calloc(1, sizeof(format_t));
 
     if ( NULL == item )
     {

@@ -228,8 +228,8 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
 
    if ( ip_tracked == 0 )
    {
-      ip_free(ip_src);
-      ip_free(ip_dst);
+      if (ip_src != NULL) ip_free(ip_src);
+      if (ip_dst != NULL) ip_free(ip_dst);
    }
 
    inpacket = 0;
@@ -363,7 +363,8 @@ int cx_track(ip_t *ip_src, uint16_t src_port,ip_t *ip_dst, uint16_t dst_port,
       /* New connections are pushed on to the head of bucket[s_hash] */
       bucket[hash] = cxt;
 
-      /* Return value should be X, telling to do fingerprinting */
+      /* Return value should be 1, telling "ip_tracked" not to try
+       * to free the memory allocated for ip_src and ip_dst          */
       return 1;
    }
 
@@ -490,8 +491,6 @@ void cxtbuffer_write () {
          next = cxtbuffer->next;
          
          cxtbuffer_free(cxtbuffer);
-         //cxt_free++;
-         cxtbuffer = NULL;
          cxtbuffer = next;
       }
       printf("[W] connections went to visit /dev/null\n");
@@ -503,8 +502,6 @@ void cxtbuffer_write () {
 
          next = cxtbuffer->next;
          cxtbuffer_free(cxtbuffer);
-         //cxt_free++;
-         cxtbuffer = NULL;
          cxtbuffer = next;
       }
       fclose(cxtFile);
@@ -522,6 +519,10 @@ void cxtbuffer_free(connection *c)
 
    if ( c->d_ip )
       ip_free(c->d_ip);
+
+   free(c);
+   c = NULL;
+   //cxt_free++;
 }
 
 void end_all_sessions() {
@@ -581,6 +582,8 @@ void game_over() {
    if ( inpacket == 0 ) {
       end_all_sessions();
       cxtbuffer_write();
+      if (strlen(dev) > 0 && dev != NULL)
+          free(dev);
       //printf("    cxt_alloc: %lu\n",cxt_alloc);
       //printf("    cxt_free : %lu\n",cxt_free);
       exit_clean(0);
