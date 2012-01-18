@@ -52,6 +52,7 @@ pcap_dumper_t *dump_handle;
 
 connection   *bucket[BUCKET_SIZE];
 connection   *cxtbuffer = NULL;
+
 static char  *dev,*chroot_dir,*output_format;
 static char  dpath[STDBUF] = "./";
 static char  *group_name, *user_name, *true_pid_name;
@@ -77,11 +78,13 @@ ip_config_t  ip_config;
 
 /*  I N T E R N A L   P R O T O T Y P E S  ************************************/
 void move_connection (connection*, connection**);
-inline void cx_track(ip_t ip_src, uint16_t src_port, ip_t ip_dst, uint16_t dst_port,uint8_t ip_proto,uint32_t p_bytes,uint8_t tcpflags,time_t tstamp, int af);
+inline int cx_track(ip_t *ip_src, uint16_t src_port, ip_t *ip_dst, uint16_t dst_port,uint8_t ip_proto,uint32_t p_bytes,uint8_t tcpflags,time_t tstamp, int af);
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet);
 void end_sessions();
 void cxtbuffer_write();
+void cxtbuffer_free(connection *c);
 void game_over();
+void exit_clean(int code);
 void check_interupt();
 void dump_active();
 void set_end_sessions();
@@ -154,46 +157,39 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
    }
 
    /* zero-ise our structure, simplifies our hashing later on */
-   ip_t ip_src = { 0 };
-   ip_t ip_dst = { 0 };
+   int ip_tracked = 0;
+   ip_t *ip_src = calloc(1, sizeof(ip_t));
+   ip_t *ip_dst = calloc(1, sizeof(ip_t));
 
    if ( eth_type == ETHERNET_TYPE_IP ) {
       /* printf("[*] Got IPv4 Packet...\n"); */
       ip4_header *ip4;
       ip4 = (ip4_header *) (packet + eth_header_len);
 
-      ip_set(&ip_config, &ip_src, &ip4->ip_src, AF_INET);
-      ip_set(&ip_config, &ip_dst, &ip4->ip_dst, AF_INET);
+      ip_set(&ip_config, ip_src, &ip4->ip_src, AF_INET);
+      ip_set(&ip_config, ip_dst, &ip4->ip_dst, AF_INET);
 
       if ( ip4->ip_p == IP_PROTO_TCP ) {
          tcp_header *tcph;
          tcph = (tcp_header *) (packet + eth_header_len + (IP_HL(ip4)*4));
          /* printf("[*] IPv4 PROTOCOL TYPE TCP:\n"); */
-         cx_track(ip_src, tcph->src_port, ip_dst, tcph->dst_port, ip4->ip_p, pheader->len, tcph->t_flags, tstamp, AF_INET);
-         inpacket = 0;
-         return;
+         ip_tracked = cx_track(ip_src, tcph->src_port, ip_dst, tcph->dst_port, ip4->ip_p, pheader->len, tcph->t_flags, tstamp, AF_INET);
       }
       else if (ip4->ip_p == IP_PROTO_UDP) {
          udp_header *udph;
          udph = (udp_header *) (packet + eth_header_len + (IP_HL(ip4)*4));
          /* printf("[*] IPv4 PROTOCOL TYPE UDP:\n"); */
-         cx_track(ip_src, udph->src_port, ip_dst, udph->dst_port, ip4->ip_p, pheader->len, 0, tstamp, AF_INET);
-         inpacket = 0;
-         return;
+         ip_tracked = cx_track(ip_src, udph->src_port, ip_dst, udph->dst_port, ip4->ip_p, pheader->len, 0, tstamp, AF_INET);
       }
       else if (ip4->ip_p == IP_PROTO_ICMP) {
          icmp_header *icmph;
          icmph = (icmp_header *) (packet + eth_header_len + (IP_HL(ip4)*4));
          /* printf("[*] IP PROTOCOL TYPE ICMP\n"); */
-         cx_track(ip_src, icmph->s_icmp_id, ip_dst, icmph->s_icmp_id, ip4->ip_p, pheader->len, 0, tstamp, AF_INET);
-         inpacket = 0;
-         return;
+         ip_tracked = cx_track(ip_src, icmph->s_icmp_id, ip_dst, icmph->s_icmp_id, ip4->ip_p, pheader->len, 0, tstamp, AF_INET);
       }
       else {
          /* printf("[*] IPv4 PROTOCOL TYPE OTHER: %d\n",ip4->ip_p); */
-         cx_track(ip_src, ip4->ip_p, ip_dst, ip4->ip_p, ip4->ip_p, pheader->len, 0, tstamp, AF_INET);
-         inpacket = 0;
-         return;
+         ip_tracked = cx_track(ip_src, ip4->ip_p, ip_dst, ip4->ip_p, ip4->ip_p, pheader->len, 0, tstamp, AF_INET);
       }
    }
 
@@ -202,41 +198,40 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
       ip6_header *ip6;
       ip6 = (ip6_header *) (packet + eth_header_len);
 
-      ip_set(&ip_config, &ip_src, &ip6->ip_src, AF_INET6);
-      ip_set(&ip_config, &ip_dst, &ip6->ip_dst, AF_INET6);
+      ip_set(&ip_config, ip_src, &ip6->ip_src, AF_INET6);
+      ip_set(&ip_config, ip_dst, &ip6->ip_dst, AF_INET6);
 
       if ( ip6->next == IP_PROTO_TCP ) {
          tcp_header *tcph;
          tcph = (tcp_header *) (packet + eth_header_len + IP6_HEADER_LEN);
          /* printf("[*] IPv6 PROTOCOL TYPE TCP:\n"); */
-         cx_track(ip_src, tcph->src_port, ip_dst, tcph->dst_port, ip6->next, pheader->len, tcph->t_flags, tstamp, AF_INET6);
-         inpacket = 0;
-         return;
+         ip_tracked = cx_track(ip_src, tcph->src_port, ip_dst, tcph->dst_port, ip6->next, pheader->len, tcph->t_flags, tstamp, AF_INET6);
       }
       else if (ip6->next == IP_PROTO_UDP) {
          udp_header *udph;
          udph = (udp_header *) (packet + eth_header_len + IP6_HEADER_LEN);
          /* printf("[*] IPv6 PROTOCOL TYPE UDP:\n"); */
-         cx_track(ip_src, udph->src_port, ip_dst, udph->dst_port, ip6->next, pheader->len, 0, tstamp, AF_INET6);
-         inpacket = 0;
-         return;
+         ip_tracked = cx_track(ip_src, udph->src_port, ip_dst, udph->dst_port, ip6->next, pheader->len, 0, tstamp, AF_INET6);
       }
       else if (ip6->next == IP6_PROTO_ICMP) {
          //icmp6_header *icmph;
          //icmph = (icmp6_header *) (packet + eth_header_len + IP6_HEADER_LEN);
 
          /* printf("[*] IPv6 PROTOCOL TYPE ICMP\n"); */
-         cx_track(ip_src, ip6->hop_lmt, ip_dst, ip6->hop_lmt, ip6->next, pheader->len, 0, tstamp, AF_INET6);
-         inpacket = 0;
-         return;
+         ip_tracked = cx_track(ip_src, ip6->hop_lmt, ip_dst, ip6->hop_lmt, ip6->next, pheader->len, 0, tstamp, AF_INET6);
       }
       else {
          /* printf("[*] IPv6 PROTOCOL TYPE OTHER: %d\n",ip6->next); */
-         cx_track(ip_src, ip6->next, ip_dst, ip6->next, ip6->next, pheader->len, 0, tstamp, AF_INET6);
-         inpacket = 0;
-         return;
+         ip_tracked = cx_track(ip_src, ip6->next, ip_dst, ip6->next, ip6->next, pheader->len, 0, tstamp, AF_INET6);
       }
    }
+
+   if ( ip_tracked == 0 )
+   {
+      ip_free(ip_src);
+      ip_free(ip_dst);
+   }
+
    inpacket = 0;
    return;
    /* else { */
@@ -246,22 +241,22 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
 }
 
 inline
-void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
+int cx_track(ip_t *ip_src, uint16_t src_port,ip_t *ip_dst, uint16_t dst_port,
                uint8_t ip_proto, uint32_t p_bytes, uint8_t tcpflags,time_t tstamp, int af) {
 
    connection *cxt = NULL;
    connection *head = NULL;
 
    /* for non-ipv6 addresses, indexes 1, 2 and 3 are zero and don't influence the hash */
-   uint64_t hash = ip_hash(&ip_src, &ip_dst, BUCKET_SIZE);
+   uint64_t hash = ip_hash(ip_src, ip_dst, BUCKET_SIZE);
 
    cxt = bucket[hash];
    head = cxt;
 
    while ( cxt != NULL ) {
       if ( cxt->s_port == src_port && cxt->d_port == dst_port
-           && ip_cmp(&cxt->s_ip, &ip_src) == 0
-           && ip_cmp(&cxt->d_ip, &ip_dst) == 0 )
+           && ip_cmp(cxt->s_ip, ip_src) == 0
+           && ip_cmp(cxt->d_ip, ip_dst) == 0 )
       {
          cxt->s_tcpFlags    |= tcpflags;
          cxt->s_total_bytes += p_bytes;
@@ -279,11 +274,11 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
             snprintf(cxt->last_dump, STDBUF, "%s", read_file);
          }
 
-         return;
+         return 0;
       }
       else if ( cxt->d_port == src_port && cxt->s_port == dst_port
-                && ip_cmp(&cxt->s_ip, &ip_dst) == 0
-                && ip_cmp(&cxt->d_ip, &ip_src) == 0 )
+                && ip_cmp(cxt->s_ip, ip_dst) == 0
+                && ip_cmp(cxt->d_ip, ip_src) == 0 )
       {
          cxt->d_tcpFlags    |= tcpflags;
          cxt->d_total_bytes += p_bytes;
@@ -301,7 +296,7 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
             snprintf(cxt->last_dump, STDBUF, "%s", read_file);
          }
 
-         return;
+         return 0;
       }
       cxt = cxt->next;
    }
@@ -369,10 +364,11 @@ void cx_track(ip_t ip_src, uint16_t src_port,ip_t ip_dst, uint16_t dst_port,
       bucket[hash] = cxt;
 
       /* Return value should be X, telling to do fingerprinting */
-      return;
+      return 1;
    }
+
    /* Should never be here! */
-   return;
+   return 0;
 }
 
 /*
@@ -492,7 +488,8 @@ void cxtbuffer_write () {
       /* Free them anyways! */
       while ( cxtbuffer != NULL ) {
          next = cxtbuffer->next;
-         free(cxtbuffer);
+         
+         cxtbuffer_free(cxtbuffer);
          //cxt_free++;
          cxtbuffer = NULL;
          cxtbuffer = next;
@@ -505,7 +502,7 @@ void cxtbuffer_write () {
          format_write(cxtFile, cxtbuffer);
 
          next = cxtbuffer->next;
-         free(cxtbuffer);
+         cxtbuffer_free(cxtbuffer);
          //cxt_free++;
          cxtbuffer = NULL;
          cxtbuffer = next;
@@ -513,6 +510,18 @@ void cxtbuffer_write () {
       fclose(cxtFile);
    }
    cxtbuffer = NULL;
+}
+
+void cxtbuffer_free(connection *c)
+{
+   if ( c == NULL )
+      return;
+
+   if ( c->s_ip )
+      ip_free(c->s_ip);
+
+   if ( c->d_ip )
+      ip_free(c->d_ip);
 }
 
 void end_all_sessions() {
@@ -572,11 +581,9 @@ void game_over() {
    if ( inpacket == 0 ) {
       end_all_sessions();
       cxtbuffer_write();
-      pcap_close(handle);
-      format_clear();
       //printf("    cxt_alloc: %lu\n",cxt_alloc);
       //printf("    cxt_free : %lu\n",cxt_free);
-      exit(0);
+      exit_clean(0);
    }
    intr_flag = 1;
 }
@@ -609,7 +616,7 @@ int dump_file_open()
 
    if ( (dump_handle=pcap_dump_open(handle, dump_file)) == NULL )
    {
-      exit(1);
+      exit_clean(1);
    }
 
    return SUCCESS;
@@ -802,7 +809,7 @@ int daemonize() {
    pid = fork();
 
    if ( pid > 0 ) {
-      exit(0); /* parent */
+      exit_clean(0); /* parent */
    }
 
    use_syslog = 1;
@@ -944,7 +951,7 @@ int main(int argc, char *argv[]) {
          break;
       case '?':
          usage(argv[0]);
-         exit(0);
+         exit_clean(0);
          break;
       case 'D':
          daemon_flag = 1;
@@ -1030,7 +1037,7 @@ int main(int argc, char *argv[]) {
 
          break;
       default:
-         exit(1);
+         exit_clean(1);
          break;
    }
 
@@ -1044,7 +1051,7 @@ int main(int argc, char *argv[]) {
    {
       printf("[!] You must specify a device OR file to read from, not both.\n");
       usage(argv[0]);
-      exit(1);
+      exit_clean(1);
    }
    else if ( (mode & MODE_FILE) && read_file) {
       /* Read from PCAP file specified by '-r' switch. */
@@ -1052,7 +1059,7 @@ int main(int argc, char *argv[]) {
       if (!(handle = pcap_open_offline(read_file, errbuf))) {
          printf("\n");
          printf("[*] Unable to open %s. (%s)\n", read_file, errbuf);
-         exit(1);
+         exit_clean(1);
       } else {
          printf(" - OK\n");
       }
@@ -1063,7 +1070,7 @@ int main(int argc, char *argv[]) {
       if ( ip_init(&ip_config, IP_SET_MEMCPY) )
       {
         printf("[!] Unable to initialise the IP library.\n");
-        exit(1);
+        exit_clean(1);
       }
       else
         printf("[*] IP library using \"memcpy\" set.\n");
@@ -1071,7 +1078,7 @@ int main(int argc, char *argv[]) {
    else if ( (mode & MODE_DEV) && dev) {
       if (getuid()) {
          printf("[*] You must be root..\n");
-         exit(1);
+         exit_clean(1);
       }
 
       printf("[*] Running cxtracker %s\n",VERSION);
@@ -1083,8 +1090,7 @@ int main(int argc, char *argv[]) {
 
       if ((handle = pcap_open_live(dev, SNAPLENGTH, 1, 500, errbuf)) == NULL) {
          printf("[*] Error pcap_open_live: %s \n", errbuf);
-         pcap_close(handle);
-         exit(1);
+         exit_clean(1);
       }
 
       // in pcap_open_live(), libpcap maintains a heap allocated buffer
@@ -1093,7 +1099,7 @@ int main(int argc, char *argv[]) {
       if ( ip_init(&ip_config, IP_SET_MEMCPY) )
       {
         printf("[*] Unable to initialise the IP library.\n");
-        exit(1);
+        exit_clean(1);
       }
       else
         printf("[*] IP library using \"memcpy\" set.\n");
@@ -1113,13 +1119,12 @@ int main(int argc, char *argv[]) {
    else
    {
       printf("[*] You must specify where to read from.\n");
-      exit(1);
+      exit_clean(1);
    }
 
    if ((pcap_compile(handle, &cfilter, bpff, 1 ,net_mask)) == -1) {
       printf("[*] Error pcap_compile user_filter: %s\n", pcap_geterr(handle));
-      pcap_close(handle);
-      exit(1);
+      exit_clean(1);
    }
 
    if (pcap_setfilter(handle, &cfilter)) {
@@ -1138,8 +1143,7 @@ int main(int argc, char *argv[]) {
    /* B0rk if we see an error... */
    if (strlen(errbuf) > 0) {
       printf("[*] Error errbuf: %s \n", errbuf);
-      pcap_close(handle);
-      exit(1);
+      exit_clean(1);
    }
 
    if(drop_privs_flag) {
@@ -1160,5 +1164,18 @@ int main(int argc, char *argv[]) {
    pcap_loop(handle,-1,got_packet,NULL);
 
    game_over();
-   return(0);
+
+   return 0;
+}
+
+void exit_clean(int code)
+{
+   // clean up the pcap handle
+   if (handle)
+      pcap_close(handle);
+
+   // clean up the custom formatter
+   format_clear();
+
+   exit(code);
 }

@@ -36,6 +36,7 @@ typedef struct _format_s {
 format_t     *custom = NULL;
 
 void format_function_append(format_t **head, void (*func)(FILE *, const struct _connection *, char *), char *prefix);
+void format_free(format_t **head);
 void format_write_cxid(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_time_start(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_time_end(FILE *fd, const connection *cxt, const char *prefix);
@@ -307,7 +308,7 @@ void format_validate(const char *format)
     // check if we have prefix
     if ( fp_e > fp_s )
     {
-        char *prefix = malloc(sizeof(char) * (fp_e - fp_s + 1));
+        char *prefix = calloc(1, sizeof(char) * (fp_e - fp_s + 1));
         if ( NULL == prefix )
         {
             fprintf(stderr, "FATAL: Unable to allocate memory for the custom formatter!\n");
@@ -316,6 +317,7 @@ void format_validate(const char *format)
         }
 
         strncpy(prefix, fp_s, fp_e-fp_s);
+        prefix[fp_e-fp_s+1] = '\0';
 
         format_function_append(&custom, (void *)&format_write_custom, prefix);
     }
@@ -329,7 +331,6 @@ void format_function_append(format_t **head, void (*func)(FILE *, const struct _
     format_t *iter = *head;
     format_t *item;
 
-
     item = malloc(sizeof(format_t));
 
     if ( NULL == item )
@@ -341,11 +342,12 @@ void format_function_append(format_t **head, void (*func)(FILE *, const struct _
     item->func = (void *)func;
     item->prefix = prefix;
 
-
+    // if head is empty then add first item
     if ( NULL == iter )
     {
         *head = item;
     }
+    // otherwise append to the tail
     else
     {
         while (NULL != iter->next)
@@ -354,6 +356,23 @@ void format_function_append(format_t **head, void (*func)(FILE *, const struct _
         iter->next = item;
     }
 }
+
+void format_free(format_t **head)
+{
+    format_t *iter = *head;
+    format_t *item;
+
+    if( NULL == iter)
+        return;
+
+    item = iter;
+
+    for (; NULL != item; iter = iter->next, item = iter)
+    {
+        free(item);
+    }
+}
+
 
 void format_write(FILE *fd, const connection *cxt)
 {
@@ -403,7 +422,7 @@ void format_write_time_duration(FILE *fd, const connection *cxt, const char *pre
 
 void format_write_ip_family(FILE *fd, const connection *cxt, const char *prefix)
 {
-    fprintf(fd, "%s%d", prefix, ip_family_get(&cxt->s_ip));
+    fprintf(fd, "%s%d", prefix, ip_family_get(cxt->s_ip));
 }
 
 void format_write_ip_protocol(FILE *fd, const connection *cxt, const char *prefix)
@@ -415,7 +434,7 @@ void format_write_ip_source_numeric(FILE *fd, const connection *cxt, const char 
 {
     char ip_s[IP_ADDRMAX];
 
-    if ( ip_ntop(&cxt->s_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_DEC) )
+    if ( ip_ntop(cxt->s_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_DEC) )
         perror("Something died in ip_ntop for src");
 
     fprintf(fd, "%s%s", prefix, ip_s);
@@ -425,7 +444,7 @@ void format_write_ip_source_fqdn(FILE *fd, const connection *cxt, const char *pr
 {
     char ip_s[IP_ADDRMAX];
 
-    if ( ip_ntop(&cxt->s_ip, ip_s, IP_ADDRMAX, 0) )
+    if ( ip_ntop(cxt->s_ip, ip_s, IP_ADDRMAX, 0) )
         perror("Something died in ip_ntop for src");
 
     fprintf(fd, "%s%s", prefix, ip_s);
@@ -435,7 +454,7 @@ void format_write_ip_source(FILE *fd, const connection *cxt, const char *prefix)
 {
     char ip_s[IP_ADDRMAX];
 
-    if ( ip_ntop(&cxt->s_ip, ip_s, IP_ADDRMAX, IP_NUMERIC) )
+    if ( ip_ntop(cxt->s_ip, ip_s, IP_ADDRMAX, IP_NUMERIC) )
         perror("Something died in ip_ntop for src");
 
     fprintf(fd, "%s%s", prefix, ip_s);
@@ -445,7 +464,7 @@ void format_write_ip_source_hex(FILE *fd, const connection *cxt, const char *pre
 {
     char ip_s[IP_ADDRMAX];
 
-    if ( ip_ntop(&cxt->s_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_HEX) )
+    if ( ip_ntop(cxt->s_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_HEX) )
         perror("Something died in ip_ntop for src");
 
     fprintf(fd, "%s%s", prefix, ip_s);
@@ -455,7 +474,7 @@ void format_write_ip_destination_numeric(FILE *fd, const connection *cxt, const 
 {
     char ip_s[IP_ADDRMAX];
 
-    if ( ip_ntop(&cxt->d_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_DEC) )
+    if ( ip_ntop(cxt->d_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_DEC) )
         perror("Something died in ip_ntop for dest");
 
     fprintf(fd, "%s%s", prefix, ip_s);
@@ -465,7 +484,7 @@ void format_write_ip_destination_fqdn(FILE *fd, const connection *cxt, const cha
 {
     char ip_s[IP_ADDRMAX];
 
-    if ( ip_ntop(&cxt->d_ip, ip_s, IP_ADDRMAX, 0) )
+    if ( ip_ntop(cxt->d_ip, ip_s, IP_ADDRMAX, 0) )
         perror("Something died in ip_ntop for dest");
 
     fprintf(fd, "%s%s", prefix, ip_s);
@@ -475,7 +494,7 @@ void format_write_ip_destination(FILE *fd, const connection *cxt, const char *pr
 {
     char ip_s[IP_ADDRMAX];
 
-    if ( ip_ntop(&cxt->d_ip, ip_s, IP_ADDRMAX, IP_NUMERIC) )
+    if ( ip_ntop(cxt->d_ip, ip_s, IP_ADDRMAX, IP_NUMERIC) )
         perror("Something died in ip_ntop for dest");
 
     fprintf(fd, "%s%s", prefix, ip_s);
@@ -485,7 +504,7 @@ void format_write_ip_destination_hex(FILE *fd, const connection *cxt, const char
 {
     char ip_s[IP_ADDRMAX];
 
-    if ( ip_ntop(&cxt->d_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_HEX) )
+    if ( ip_ntop(cxt->d_ip, ip_s, IP_ADDRMAX, IP_NUMERIC_HEX) )
         perror("Something died in ip_ntop for dest");
 
     fprintf(fd, "%s%s", prefix, ip_s);
@@ -561,14 +580,14 @@ void format_clear()
     format_t *iter = custom;
 
     // clean up our custom formatter
-    while (NULL != iter)
+    while (iter != NULL)
     {
-        if ( iter->prefix )
-            free(iter->prefix);
-
         custom = iter;
 
         iter = iter->next;
+
+        if ( custom->prefix )
+            free(custom->prefix);
 
         free(custom);
     }

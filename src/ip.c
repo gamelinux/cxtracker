@@ -76,7 +76,7 @@ ip_t *ip_alloc(const char *ip)
     if( NULL == ip )
         return NULL;
 
-    if( (ret=calloc(sizeof(ip_t), 1)) == NULL )
+    if( (ret=calloc(1, sizeof(ip_t))) == NULL )
         return NULL;
 
     if( ip_pton(ret, ip) != 1 )
@@ -95,7 +95,7 @@ ip_t *ip_alloc_raw(const void *ip, int family)
     if( NULL == ip || (family != AF_INET && family != AF_INET6) )
         return NULL;
 
-    if( (ret=calloc(sizeof(ip_t), 1)) == NULL )
+    if( (ret=calloc(1, sizeof(ip_t))) == NULL )
         return NULL;
 
     ip_set_raw_with_memcpy(ret, ip, family);
@@ -145,7 +145,9 @@ void ip_set_raw_with_pointer_copy(ip_t *dst, const void *src, int family)
 void ip_set_raw_with_memcpy(ip_t *dst, const void *src, int family)
 {
     dst->family = family;
-    dst->addr = calloc('\0', sizeof(ip_addr_t));
+
+    if( dst->addr == NULL )
+        dst->addr = calloc(1, sizeof(ip_addr_t));
 
     if( family == AF_INET )
     {
