@@ -1,7 +1,7 @@
 #Makefile
 CC=gcc
 
-OCFLAGS=-g -O3
+OCFLAGS=-g -O3 -Wall -Wextra
 DCFLAGS=-g
 PCFLAGS=-g -pg
 LIBS=-lpcap

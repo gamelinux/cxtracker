@@ -49,6 +49,7 @@ time_t       tstamp;
 
 pcap_t        *handle;
 pcap_dumper_t *dump_handle;
+struct bpf_program cfilter;
 
 connection   *bucket[BUCKET_SIZE];
 connection   *cxtbuffer = NULL;
@@ -61,12 +62,12 @@ static char  *pidpath = "/var/run";
 static int   verbose, inpacket, intr_flag, use_syslog, dump_with_flush;
 static int   mode;
 static char  *read_file;
-static int64_t  read_file_offset = 0;
+static uint64_t  read_file_offset = 0;
 
 static uint64_t roll_size;
 static time_t   roll_time;
 static time_t   roll_time_last;
-static int64_t  dump_file_offset = 0;
+static uint64_t  dump_file_offset = 0;
 static char     *dump_file_prefix;
 static char     dump_file[STDBUF];
 //uint64_t        max_cxt   = 0;
@@ -116,7 +117,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          dump_file_roll();
       }
 
-      dump_file_offset = (int64_t)ftell((FILE *)dump_handle);
+      dump_file_offset = (uint64_t)ftell((FILE *)dump_handle);
 
       /* check if we should roll on size */
       if ( (roll_size > 0) &&
@@ -133,7 +134,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          pcap_dump_flush(dump_handle);
    }
    else if ( mode & MODE_FILE ) {
-      read_file_offset = (int64_t)ftell(pcap_file(handle)) - pheader->caplen - 16;
+      read_file_offset = (uint64_t)ftell(pcap_file(handle)) - pheader->caplen - 16;
    }
 
    /* printf("[*] Got network packet...\n"); */
@@ -802,6 +803,9 @@ static int create_pid_file(char *path, char *filename) {
    snprintf(pid_buffer, sizeof(pid_buffer), "%d\n", (int) getpid());
    if ( ftruncate(fd, 0) != 0 ) { return ERROR; }
    if ( write(fd, pid_buffer, strlen(pid_buffer)) != 0 ) { return ERROR; }
+
+   close(fd);
+
    return SUCCESS;
 }
 
@@ -888,7 +892,6 @@ static void usage(const char *program_name) {
 int main(int argc, char *argv[]) {
 
    int ch, fromfile, setfilter, version, drop_privs_flag, daemon_flag, chroot_flag;
-   struct bpf_program cfilter;
    char *bpff, errbuf[PCAP_ERRBUF_SIZE];
    extern char *optarg;
    char roll_metric = 0;
@@ -1173,6 +1176,8 @@ int main(int argc, char *argv[]) {
 
 void exit_clean(int code)
 {
+   pcap_freecode(&cfilter); // filter code not needed after setfilter
+
    // clean up the pcap handle
    if (handle)
       pcap_close(handle);

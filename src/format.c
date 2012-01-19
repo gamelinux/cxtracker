@@ -114,15 +114,18 @@ void format_validate(const char *format)
     int match = 0;
     int format_length = 0;
 
+    int use_standard = 0;
+
     // Check for depricated options first
     if (   strncmp(format, "sguil", 5)   == 0
         || strncmp(format, "openfpc", 7) == 0
         || strncmp(format, "nsmf", 4)    == 0 ) {
         fprintf(stdout, "[w] Predefined format %s is depricated, use \'standard\' instead.\n", format);
-        format = strdup("standard");
+
+        use_standard = 1;
     }
     // check for pre-packaged options first
-    if ( strncmp(format, "standard", 8) == 0 )
+    if ( strncmp(format, "standard", 8) == 0 || use_standard )
         format_qualified = strdup("%cxd|%stm|%etm|%dur|%pro|%sin|%spt|%din|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl");
     else if ( strncmp(format, "indexed", 7) == 0 )
         format_qualified = strdup("%cxd|%stm|%etm|%dur|%pro|%sip|%spt|%dip|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl|%spf|%spo|%epf|%epo");
