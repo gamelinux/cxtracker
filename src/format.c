@@ -96,9 +96,8 @@ void format_options()
     fprintf(stdout, "  %%epo          pcap file offset of last packet in session\n");
     fprintf(stdout, "\n");
     fprintf(stdout, " Format Meta-Options:\n");
-    fprintf(stdout, "  sguil          Formatted output compatible with sguil\n");
-    fprintf(stdout, "  openfpc        Formatted output compatible with openfpc\n");
-    fprintf(stdout, "  nsmf           Formatted output compatible with NSMF\n");
+    fprintf(stdout, "  standard       Standard formatted output compatible with Sguil and OpenFPC etc.\n");
+    fprintf(stdout, "  indexed        Pcap-indexed formatted output compatible with Echidna etc.\n");
     fprintf(stdout, "\n");
 }
 
@@ -115,10 +114,17 @@ void format_validate(const char *format)
     int match = 0;
     int format_length = 0;
 
+    // Check for depricated options first
+    if (   strncmp(format, "sguil", 5)   == 0
+        || strncmp(format, "openfpc", 7) == 0
+        || strncmp(format, "nsmf", 4)    == 0 ) {
+        fprintf(stdout, "[w] Predefined format %s is depricated, use \'standard\' instead.\n", format);
+        format = strdup("standard");
+    }
     // check for pre-packaged options first
-    if ( strncmp(format, "sguil", 5) == 0 || strncmp(format, "openfpc", 5) == 0 )
+    if ( strncmp(format, "standard", 8) == 0 )
         format_qualified = strdup("%cxd|%stm|%etm|%dur|%pro|%sin|%spt|%din|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl");
-    else if ( strncmp(format, "nsmf", 5) == 0 )
+    else if ( strncmp(format, "indexed", 7) == 0 )
         format_qualified = strdup("%cxd|%stm|%etm|%dur|%pro|%sip|%spt|%dip|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl|%spf|%spo|%epf|%epo");
     else
         format_qualified = strdup(format);
