@@ -1,0 +1,28 @@
+## cxtracker roadmap
+
+# Version 2.0
+  * We need to support other methods for fast packetcapture/0copy etc.
+  * libpcap 1.0.0+ support and pcap_set_buffer_size etc.
+  * support for using afpacket on linux
+
+# Version 1.5
+  * Limiting packet-capture on bytes or packets in a session:
+    - Drop capturing after XXXX packets or YYYY bytes
+      - based on sessions
+      - configurable for client and server separatly
+      - Update pcap indexing to Cohere
+
+# Version 1.0
+  * Sniff traffic from interface (-i)
+  * Read pcap files (-r)
+  * Specify output format (-f)
+  * Specify BPF (-b)
+  * Specify directory to write cxtracker logs to (-d)
+  * Drop priveleges ( -u and -g)
+  * Chroot (-T)
+  * Specify pidfile (-p and -P)
+  * Write pcap to file  (-w)
+  * Pcap roleover (-s and -t)
+  * Pcap indexing in cxtracker output
+  * pcap stats, like dropped packets etc.
+
