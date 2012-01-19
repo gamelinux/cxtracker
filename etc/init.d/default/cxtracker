@@ -1,0 +1,6 @@
+# Example default file for Debian/Ubuntu systems
+# Set main configuration options here
+CXT_ARCHIVE_DIR="-d /nsm_data/`hostname -s`/cxtracker -f nsmf "
+CXT_INTERFACE="-i eth1"
+CXT_USER="-u nsm"
+CXT_GROUP="-g nsm"

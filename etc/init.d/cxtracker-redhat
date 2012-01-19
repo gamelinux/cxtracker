@@ -1,0 +1,77 @@
+#!/bin/sh
+#
+# Example Init file for cxtracker on Redhat systems
+# Contrib from: Jeremy Hoel
+#
+# chkconfig: 2345 40 60
+# description:  cxtracker is a session capture tool
+#
+# processname: cxtracker
+
+
+source /etc/rc.d/init.d/functions
+source /etc/sysconfig/network
+
+### Check that networking is up.
+[ "${NETWORKING}" == "no" ] && exit 0
+
+# To filter out ip6 which Sguil cant handle...
+BPF="ip"
+INT="eth1"
+
+### Default variables
+SYSCONFIG="/etc/sysconfig/cxtracker"
+
+### Read configuration
+[ -r "$SYSCONFIG" ] && source "$SYSCONFIG"
+
+RETVAL=0
+prog="/usr/bin/cxtracker"
+desc="Session tracking"
+
+PIDFILE="/var/run/cxtracker-${INT}.pid"
+OUTPUT="/var/log/snort/sguil/sancp/"
+OPTIONS="-u sguil -g sguil"
+META="sguil"
+
+
+start() {
+	echo -n $"Starting $desc ($prog): "
+	  CX_OPTS="-D -f $META -i $INT -d $OUTPUT -b $BPF $OPTIONS -p $PIDFILE"
+	  daemon $prog $CX_OPTS
+	RETVAL=$?
+	echo
+	return $RETVAL
+}
+
+stop() {
+	echo -n $"Shutting down $desc ($prog): "
+	killproc $prog
+	RETVAL=$?
+	echo
+	[ $RETVAL -eq 0 ] && rm -f $PIDFILE
+	return $RETVAL
+}
+
+restart() {
+	stop
+	start
+}
+
+
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  restart)
+	restart
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|restart}"
+	RETVAL=1
+esac
+
+exit $RETVAL
