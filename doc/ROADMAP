@@ -11,6 +11,11 @@
       - based on sessions
       - configurable for client and server separatly
       - Update pcap indexing to Cohere
+  * Limiting packet-capture for know SSL/TLS/Encrypted traffic
+    - Maybe check payload for content and if it matches within
+      the first 20 packets, dont log anymore ?!!?
+      - Maybe mark the IP+Port of the server as encrypted for
+        future 'skip inspection' ?
 
 # Version 1.0
   * Sniff traffic from interface (-i)

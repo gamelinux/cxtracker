@@ -46,6 +46,7 @@
 /*  G L O B A L E S  **********************************************************/
 u_int64_t    cxtrackerid;
 time_t       tstamp;
+u_short      vlanid;
 
 pcap_t        *handle;
 pcap_dumper_t *dump_handle;
@@ -144,17 +145,20 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
    eth_type = ntohs(eth_hdr->eth_ip_type);
    int eth_header_len;
    eth_header_len = ETHERNET_HEADER_LEN;
+   vlanid = 0;
 
    if ( eth_type == ETHERNET_TYPE_8021Q ) {
       /* printf("[*] ETHERNET TYPE 8021Q\n"); */
       eth_type = ntohs(eth_hdr->eth_8_ip_type);
       eth_header_len +=4;
+      vlanid = ntohs(eth_hdr->eth_8_vid);
    }
 
    else if ( eth_type == (ETHERNET_TYPE_802Q1MT|ETHERNET_TYPE_802Q1MT2|ETHERNET_TYPE_802Q1MT3|ETHERNET_TYPE_8021AD) ) {
       /* printf("[*] ETHERNET TYPE 802Q1MT\n"); */
       eth_type = ntohs(eth_hdr->eth_82_ip_type);
       eth_header_len +=8;
+      vlanid = ntohs(eth_hdr->eth_82_vid);
    }
 
    /* zero-ise our structure, simplifies our hashing later on */
@@ -256,6 +260,7 @@ int cx_track(ip_t *ip_src, uint16_t src_port,ip_t *ip_dst, uint16_t dst_port,
 
    while ( cxt != NULL ) {
       if ( cxt->s_port == src_port && cxt->d_port == dst_port
+           && cxt->vlanid == vlanid
            && ip_cmp(cxt->s_ip, ip_src) == 0
            && ip_cmp(cxt->d_ip, ip_dst) == 0 )
       {
@@ -278,6 +283,7 @@ int cx_track(ip_t *ip_src, uint16_t src_port,ip_t *ip_dst, uint16_t dst_port,
          return 0;
       }
       else if ( cxt->d_port == src_port && cxt->s_port == dst_port
+                && cxt->vlanid == vlanid
                 && ip_cmp(cxt->s_ip, ip_dst) == 0
                 && ip_cmp(cxt->d_ip, ip_src) == 0 )
       {
@@ -312,6 +318,7 @@ int cx_track(ip_t *ip_src, uint16_t src_port,ip_t *ip_dst, uint16_t dst_port,
       /* printf("[*] New connection...\n"); */
       cxt->cxid           = cxtrackerid;
       cxt->ipversion      = af;
+      cxt->vlanid         = vlanid;
       cxt->s_tcpFlags     = tcpflags;
       /* cxt->d_tcpFlags     = 0x00; */
       cxt->s_total_bytes  = p_bytes;
@@ -583,7 +590,7 @@ void game_over() {
    if ( inpacket == 0 ) {
       end_all_sessions();
       cxtbuffer_write();
-      if (strlen(dev) > 0 && dev != NULL)
+      if (dev != NULL && strlen(dev) > 0)
           free(dev);
       //printf("    cxt_alloc: %lu\n",cxt_alloc);
       //printf("    cxt_free : %lu\n",cxt_free);
@@ -982,6 +989,7 @@ int main(int argc, char *argv[]) {
       case 'r':
          read_file = strdup(optarg);
          mode |= MODE_FILE;
+         dev = NULL;
          break;
       case 'w':
          dump_file_prefix = strdup(optarg);

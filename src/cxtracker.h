@@ -318,6 +318,7 @@ typedef struct _icmp6_header {
 typedef struct _connection {
         u_int64_t  cxid;                /* connection id */
         int        ipversion;           /* IP version (4/6) */
+        u_short    vlanid;              /* VLAN id if any */
         u_int8_t   proto;               /* IP protocoll type */
         ip_t       *s_ip;               /* source address */
         ip_t       *d_ip;               /* destination address */

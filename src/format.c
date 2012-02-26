@@ -42,6 +42,7 @@ void format_write_time_start(FILE *fd, const connection *cxt, const char *prefix
 void format_write_time_end(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_time_duration(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_ip_protocol(FILE *fd, const connection *cxt, const char *prefix);
+void format_write_vlan_id(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_ip_family(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_ip_source(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_ip_source_hex(FILE *fd, const connection *cxt, const char *prefix);
@@ -72,6 +73,7 @@ void format_options()
     fprintf(stdout, "  %%stm          start time [unix timestamp])\n");
     fprintf(stdout, "  %%etm          end time [unix timestamp]\n");
     fprintf(stdout, "  %%dur          duration [seconds]\n");
+    fprintf(stdout, "  %%vln          VLAN ID\n");
     fprintf(stdout, "  %%ver          IP family\n");
     fprintf(stdout, "  %%pro          protocol\n");
     fprintf(stdout, "  %%sin          source IP [IPv4 = integer, IPv6 = literal]\n");
@@ -175,6 +177,11 @@ void format_validate(const char *format)
             {
                 match = 4;
                 func = (void *)&format_write_ip_family;
+            }
+            else if ( strncmp(fp_e, "%vln", 4) == 0 )
+            {
+                match = 4;
+                func = (void *)&format_write_vlan_id;
             }
             else if ( strncmp(fp_e, "%pro", 4) == 0 )
             {
@@ -437,6 +444,11 @@ void format_write_ip_family(FILE *fd, const connection *cxt, const char *prefix)
 void format_write_ip_protocol(FILE *fd, const connection *cxt, const char *prefix)
 {
     fprintf(fd, "%s%u", prefix, cxt->proto);
+}
+
+void format_write_vlan_id(FILE *fd, const connection *cxt, const char *prefix)
+{
+    fprintf(fd, "%s%d", prefix, cxt->vlanid);
 }
 
 void format_write_ip_source_numeric(FILE *fd, const connection *cxt, const char *prefix)
