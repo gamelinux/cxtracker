@@ -72,8 +72,8 @@ void format_options()
 {
     fprintf(stdout, " Format Options:\n");
     fprintf(stdout, "  %%cxd          unique cxtracker ID\n");
-    fprintf(stdout, "  %%stm          start time [unix timestamp])\n");
-    fprintf(stdout, "  %%stu          start time [unix timestamp.usec])\n");
+    fprintf(stdout, "  %%stm          start time [unix timestamp]\n");
+    fprintf(stdout, "  %%stu          start time [unix timestamp.usec]\n");
     fprintf(stdout, "  %%etm          end time [unix timestamp]\n");
     fprintf(stdout, "  %%etu          end time [unix timestamp.usec]\n");
     fprintf(stdout, "  %%dur          duration [seconds]\n");
@@ -82,12 +82,12 @@ void format_options()
     fprintf(stdout, "  %%pro          protocol\n");
     fprintf(stdout, "  %%sin          source IP [IPv4 = integer, IPv6 = literal]\n");
     fprintf(stdout, "  %%sip          source IP [IPv4/IPv6 = literal]\n");
-    fprintf(stdout, "  %%six          source IP [IPv4/IPv6 = hex\n");
-    fprintf(stdout, "  %%sih          source IP [IPv4/IPv6 = host lookup\n");
+    fprintf(stdout, "  %%six          source IP [IPv4/IPv6 = hex]\n");
+    fprintf(stdout, "  %%sih          source IP [IPv4/IPv6 = host lookup]\n");
     fprintf(stdout, "  %%din          destination IP [IPv4 = integer, IPv6 = literal]\n");
     fprintf(stdout, "  %%dip          destination IP [IPv4/IPv6 = literal]\n");
-    fprintf(stdout, "  %%dix          destination IP [IPv4/IPv6 = hex\n");
-    fprintf(stdout, "  %%dih          destination IP [IPv4/IPv6 = host lookup\n");
+    fprintf(stdout, "  %%dix          destination IP [IPv4/IPv6 = hex]\n");
+    fprintf(stdout, "  %%dih          destination IP [IPv4/IPv6 = host lookup]\n");
     fprintf(stdout, "  %%spt          source port\n");
     fprintf(stdout, "  %%dpt          destination port\n");
     fprintf(stdout, "  %%spk          total packets sent from the source IP during the session\n");
