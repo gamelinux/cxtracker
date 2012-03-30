@@ -333,10 +333,10 @@ typedef struct _connection {
         u_int8_t   d_tcpFlags;          /* tcpflags sent by destination */
         char       start_dump[STDBUF];  /* dump file of starting packet */
         int64_t    start_offset;        /* byte offset of the starting packet */
-        time_t     start_time;          /* connection start time */
+        struct timeval start_time;      /* connection start time */
         char       last_dump[STDBUF];   /* dump file of last packet */
         int64_t    last_offset;         /* byte offset of the last packet */
-        time_t     last_pkt_time;       /* last seen packet time */
+        struct timeval last_pkt_time;   /* last seen packet time */
 
         struct _connection *prev;       /* Pointer to prev connection */
         struct _connection *next;       /* Pointer to next connection */

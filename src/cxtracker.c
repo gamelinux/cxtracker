@@ -45,7 +45,7 @@
 
 /*  G L O B A L E S  **********************************************************/
 u_int64_t    cxtrackerid;
-time_t       tstamp;
+struct timeval tstamp;
 u_short      vlanid;
 
 pcap_t        *handle;
@@ -80,7 +80,7 @@ ip_config_t  ip_config;
 
 /*  I N T E R N A L   P R O T O T Y P E S  ************************************/
 void move_connection (connection*, connection**);
-inline int cx_track(ip_t *ip_src, uint16_t src_port, ip_t *ip_dst, uint16_t dst_port,uint8_t ip_proto,uint32_t p_bytes,uint8_t tcpflags,time_t tstamp, int af);
+inline int cx_track(ip_t *ip_src, uint16_t src_port, ip_t *ip_dst, uint16_t dst_port,uint8_t ip_proto,uint32_t p_bytes,uint8_t tcpflags,struct timeval tstamp, int af);
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet);
 void end_sessions();
 void cxtbuffer_write();
@@ -103,7 +103,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
    if ( intr_flag != 0 ) { check_interupt(); }
    inpacket = 1;
 
-   tstamp = pheader->ts.tv_sec;
+   tstamp = pheader->ts;
 
    /* are we dumping */
    if (mode & MODE_DUMP) {
@@ -247,7 +247,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
 
 inline
 int cx_track(ip_t *ip_src, uint16_t src_port,ip_t *ip_dst, uint16_t dst_port,
-               uint8_t ip_proto, uint32_t p_bytes, uint8_t tcpflags,time_t tstamp, int af) {
+               uint8_t ip_proto, uint32_t p_bytes, uint8_t tcpflags,struct timeval tstamp, int af) {
 
    connection *cxt = NULL;
    connection *head = NULL;
@@ -387,8 +387,9 @@ int cx_track(ip_t *ip_src, uint16_t src_port,ip_t *ip_dst, uint16_t dst_port,
 void end_sessions() {
 
    connection *cxt;
-   time_t check_time;
-   check_time = time(NULL);
+   struct timeval check_time;
+   check_time.tv_sec  = time(NULL);
+   //check_time.tv_usec = 0;
    int cxkey, xpir;
    uint32_t curcxt  = 0;
    uint32_t expired = 0;
@@ -402,17 +403,17 @@ void end_sessions() {
          /* TCP */
          if ( cxt->proto == IP_PROTO_TCP ) {
            /* FIN from both sides */
-           if ( cxt->s_tcpFlags & TF_FIN && cxt->d_tcpFlags & TF_FIN && (check_time - cxt->last_pkt_time) > 5 ) {
+           if ( cxt->s_tcpFlags & TF_FIN && cxt->d_tcpFlags & TF_FIN && (check_time.tv_sec - cxt->last_pkt_time.tv_sec) > 5 ) {
               xpir = 1;
            }
            /* RST from eather side */
-           else if ( (cxt->s_tcpFlags & TF_RST || cxt->d_tcpFlags & TF_RST) && (check_time - cxt->last_pkt_time) > 5) {
+           else if ( (cxt->s_tcpFlags & TF_RST || cxt->d_tcpFlags & TF_RST) && (check_time.tv_sec - cxt->last_pkt_time.tv_sec) > 5) {
               xpir = 1;
            }
            /* if not a complete TCP 3-way handshake */
            else if ( ( ( !(cxt->s_tcpFlags&TF_SYN) ) && ( !(cxt->s_tcpFlags&TF_ACK) ) ) || (
                        ( ( !(cxt->d_tcpFlags&TF_SYN) ) && ( !(cxt->d_tcpFlags&TF_ACK) ) ) &&
-                       ( (check_time-cxt->last_pkt_time) > 30)
+                       ( (check_time.tv_sec - cxt->last_pkt_time.tv_sec) > 30)
                      )
                    ) {
               xpir = 1;
@@ -421,19 +422,19 @@ void end_sessions() {
            //else if ( (cxt->s_tcpFlags&TF_SYNACK || cxt->d_tcpFlags&TF_SYNACK) && ((check_time - cxt->last_pkt_time) > 120)) {
            //   xpir = 1;
            //}
-           else if ( (check_time - cxt->last_pkt_time) > 600 ) {
+           else if ( (check_time.tv_sec - cxt->last_pkt_time.tv_sec) > 600 ) {
               xpir = 1;
            }
          }
-         else if ( cxt->proto == IP_PROTO_UDP && (check_time - cxt->last_pkt_time) > 60 ) {
+         else if ( cxt->proto == IP_PROTO_UDP && (check_time.tv_sec - cxt->last_pkt_time.tv_sec) > 60 ) {
                xpir = 1;
          }
          else if ( cxt->proto == IP_PROTO_ICMP || cxt->proto == IP6_PROTO_ICMP ) {
-            if ( (check_time - cxt->last_pkt_time) > 60 ) {
+            if ( (check_time.tv_sec - cxt->last_pkt_time.tv_sec) > 60 ) {
                xpir = 1;
             }
          }
-         else if ( (check_time - cxt->last_pkt_time) > 300 ) {
+         else if ( (check_time.tv_sec - cxt->last_pkt_time.tv_sec) > 300 ) {
             xpir = 1;
          }
 
@@ -489,7 +490,7 @@ void cxtbuffer_write () {
    FILE *cxtFile;
    char cxtfname[4096];
 
-   sprintf(cxtfname, "%sstats.%s.%ld", dpath, dev, tstamp);
+   sprintf(cxtfname, "%sstats.%s.%ld", dpath, dev, tstamp.tv_sec);
    cxtFile = fopen(cxtfname, "w");
 
    if (cxtFile == NULL) {
