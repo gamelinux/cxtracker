@@ -40,9 +40,14 @@ void format_free(format_t **head);
 void format_write_cxid(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_time_start(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_utime_start(FILE *fd, const connection *cxt, const char *prefix);
+void format_write_unixtime_start(FILE *fd, const connection *cxt, const char *prefix);
+void format_write_unixutime_start(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_time_end(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_utime_end(FILE *fd, const connection *cxt, const char *prefix);
+void format_write_unixtime_end(FILE *fd, const connection *cxt, const char *prefix);
+void format_write_unixutime_end(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_time_duration(FILE *fd, const connection *cxt, const char *prefix);
+//void format_write_unixutime_duration(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_ip_protocol(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_vlan_id(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_ip_family(FILE *fd, const connection *cxt, const char *prefix);
@@ -72,11 +77,16 @@ void format_options()
 {
     fprintf(stdout, " Format Options:\n");
     fprintf(stdout, "  %%cxd          unique cxtracker ID\n");
-    fprintf(stdout, "  %%stm          start time [unix timestamp]\n");
-    fprintf(stdout, "  %%stu          start time [unix timestamp.usec]\n");
-    fprintf(stdout, "  %%etm          end time [unix timestamp]\n");
-    fprintf(stdout, "  %%etu          end time [unix timestamp.usec]\n");
+    fprintf(stdout, "  %%stm          start time [gmtime]\n");
+    fprintf(stdout, "  %%stmu         start time [gmtime.usec]\n");
+    fprintf(stdout, "  %%stu          start time [unix timestamp]\n");
+    fprintf(stdout, "  %%stuu         start time [unix timestamp.usec]\n");
+    fprintf(stdout, "  %%etm          end time [gmtime]\n");
+    fprintf(stdout, "  %%etmu         end time [gmtime.usec]\n");
+    fprintf(stdout, "  %%etu          end time [unix timestamp]\n");
+    fprintf(stdout, "  %%etuu         end time [unix timestamp.usec]\n");
     fprintf(stdout, "  %%dur          duration [seconds]\n");
+//  fprintf(stdout, "  %%dur          duration [seconds.usec]\n");
     fprintf(stdout, "  %%vln          VLAN ID\n");
     fprintf(stdout, "  %%ver          IP family\n");
     fprintf(stdout, "  %%pro          protocol\n");
@@ -162,25 +172,45 @@ void format_validate(const char *format)
                 match = 4;
                 func = (void *)&format_write_cxid;
             }
+            else if ( strncmp(fp_e, "%stmu", 5) == 0 )
+            {
+                match = 5;
+                func = (void *)&format_write_utime_start;
+            }
             else if ( strncmp(fp_e, "%stm", 4) == 0 )
             {
                 match = 4;
                 func = (void *)&format_write_time_start;
             }
+            else if ( strncmp(fp_e, "%stuu", 5) == 0 )
+            {
+                match = 5;
+                func = (void *)&format_write_unixutime_start;
+            }
             else if ( strncmp(fp_e, "%stu", 4) == 0 )
             {
                 match = 4;
-                func = (void *)&format_write_utime_start;
+                func = (void *)&format_write_unixtime_start;
+            }
+            else if ( strncmp(fp_e, "%etmu", 5) == 0 )
+            {
+                match = 5;
+                func = (void *)&format_write_utime_end;
             }
             else if ( strncmp(fp_e, "%etm", 4) == 0 )
             {
                 match = 4;
                 func = (void *)&format_write_time_end;
             }
+            else if ( strncmp(fp_e, "%etuu", 5) == 0 )
+            {
+                match = 5;
+                func = (void *)&format_write_unixutime_end;
+            }
             else if ( strncmp(fp_e, "%etu", 4) == 0 )
             {
                 match = 4;
-                func = (void *)&format_write_utime_end;
+                func = (void *)&format_write_unixtime_end;
             }
             else if ( strncmp(fp_e, "%dur", 4) == 0 )
             {
@@ -445,6 +475,16 @@ void format_write_utime_start(FILE *fd, const connection *cxt, const char *prefi
     fprintf(fd, "%s%s.%lu", prefix, t, cxt->start_time.tv_usec);
 }
 
+void format_write_unixtime_start(FILE *fd, const connection *cxt, const char *prefix)
+{
+    fprintf(fd, "%s%lu", prefix, cxt->start_time.tv_sec);
+}
+
+void format_write_unixutime_start(FILE *fd, const connection *cxt, const char *prefix)
+{
+    fprintf(fd, "%s%lu.%lu", prefix, cxt->start_time.tv_sec, cxt->start_time.tv_usec);
+}
+
 void format_write_time_end(FILE *fd, const connection *cxt, const char *prefix)
 {
     char t[80];
@@ -459,6 +499,16 @@ void format_write_utime_end(FILE *fd, const connection *cxt, const char *prefix)
 
     strftime(t, 80, "%F %H:%M:%S", gmtime(&cxt->last_pkt_time.tv_sec));
     fprintf(fd, "%s%s.%lu", prefix, t, cxt->last_pkt_time.tv_usec);
+}
+
+void format_write_unixtime_end(FILE *fd, const connection *cxt, const char *prefix)
+{
+    fprintf(fd, "%s%lu", prefix, cxt->last_pkt_time.tv_sec);
+}
+
+void format_write_unixutime_end(FILE *fd, const connection *cxt, const char *prefix)
+{
+    fprintf(fd, "%s%lu.%lu", prefix, cxt->last_pkt_time.tv_sec, cxt->last_pkt_time.tv_usec);
 }
 
 void format_write_time_duration(FILE *fd, const connection *cxt, const char *prefix)
