@@ -71,6 +71,7 @@ void format_write_pcap_file_start(FILE *fd, const connection *cxt, const char *p
 void format_write_pcap_offset_start(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_pcap_file_end(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_pcap_offset_end(FILE *fd, const connection *cxt, const char *prefix);
+void format_write_newline(FILE *fd, const connection *cxt, const char *prefix);
 void format_write_custom(FILE *fd, const connection *cxt, const char *prefix);
 
 void format_options()
@@ -110,6 +111,7 @@ void format_options()
     fprintf(stdout, "  %%spo          pcap file offset of start packet in session\n");
     fprintf(stdout, "  %%epf          pcap file containing last packet in session\n");
     fprintf(stdout, "  %%epo          pcap file offset of last packet in session\n");
+    fprintf(stdout, "  %%nn           Newline\n");
     fprintf(stdout, "\n");
     fprintf(stdout, " Format Meta-Options:\n");
     fprintf(stdout, "  standard       Standard formatted output compatible with Sguil and OpenFPC etc.\n");
@@ -331,6 +333,11 @@ void format_validate(const char *format)
             {
                 match = 4;
                 func = (void *)&format_write_pcap_offset_end;
+            }
+            else if ( strncmp(fp_e, "%nn", 3) == 0 )
+            {
+                match = 3;
+                func = (void *)&format_write_newline;
             }
         }
 
@@ -671,9 +678,19 @@ void format_write_pcap_file_end(FILE *fd, const connection *cxt, const char *pre
     fprintf(fd, "%s%s", prefix, cxt->last_dump);
 }
 
+void format_write_newline(FILE *fd, const connection *cxt, const char *prefix)
+{
+    fprintf(fd, "\n");
+    return;
+    (void) cxt;
+    (void) prefix;
+}
+
 void format_write_custom(FILE *fd, const connection *cxt, const char *prefix)
 {
     fprintf(fd, "%s", prefix);
+    return;
+    (void) cxt;
 }
 
 void format_clear()

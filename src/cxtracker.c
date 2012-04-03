@@ -239,6 +239,7 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
 
    inpacket = 0;
    return;
+   (void) useless;
    /* else { */
    /*   printf("[*] ETHERNET TYPE : %x\n", eth_hdr->eth_ip_type); */
    /*   return; */
