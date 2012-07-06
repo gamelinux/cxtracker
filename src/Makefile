@@ -24,7 +24,7 @@ debug: $(OBJS)
 	$(CC) $(OBJS) -o cxtracker $(LIBS) $(DCFLAGS) $(LDFLAGS)
 
 profile: $(OBJS)
-	$(CC) $(OBJS) -o cxtracker $(LIBS) $(RCFLAGS) $(LDFLAGS)
+	$(CC) $(OBJS) -o cxtracker $(LIBS) $(PCFLAGS) $(LDFLAGS)
 
 clean:
 	-rm -f ${OBJS} ${TARGETS}
