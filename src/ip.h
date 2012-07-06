@@ -292,17 +292,18 @@ static inline int ip_contains(const ip_t *haystack, const ip_t *needle)
  *   * IPV4 - 0.0.0.0
  *   * IPV6 - 0000:0000:0000:0000:0000:0000:0000:0000:0000, ::, or similar.
  */
-static inline uint64_t ip_hash(const ip_t *ip1, const ip_t *ip2, uint64_t size)
+static inline uint64_t ip_hash(const ip_t *ip1, const ip_t *ip2, uint16_t sp, uint16_t dp, uint8_t pr, uint64_t size)
 {
     if ( ip_family_get(ip1) == AF_INET6 )
     {
         return ( ip1->addr->ip32[0] + ip1->addr->ip32[1] +
                  ip1->addr->ip32[2] + ip1->addr->ip32[3] +
                  ip2->addr->ip32[0] + ip2->addr->ip32[1] +
-                 ip2->addr->ip32[2] + ip2->addr->ip32[3] ) % size;
+                 ip2->addr->ip32[2] + ip2->addr->ip32[3] +
+                 sp + dp + pr ) % size;
     }
 
-    return ( ip1->addr->ip32[0] + ip2->addr->ip32[0] ) % size;
+    return ( ip1->addr->ip32[0] + ip2->addr->ip32[0] + sp + dp + pr ) % size;
 }
 
 //

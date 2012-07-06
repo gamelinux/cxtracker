@@ -254,7 +254,7 @@ int cx_track(ip_t *ip_src, uint16_t src_port,ip_t *ip_dst, uint16_t dst_port,
    connection *head = NULL;
 
    /* for non-ipv6 addresses, indexes 1, 2 and 3 are zero and don't influence the hash */
-   uint64_t hash = ip_hash(ip_src, ip_dst, BUCKET_SIZE);
+   uint64_t hash = ip_hash(ip_src, ip_dst, src_port, dst_port, ip_proto, BUCKET_SIZE);
 
    cxt = bucket[hash];
    head = cxt;
