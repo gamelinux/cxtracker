@@ -857,14 +857,20 @@ static int go_daemon() {
     return daemonize(NULL);
 }
 
+static void banner() {
+    fprintf(stdout, "cxtracker - v%s\n", VERSION);
+    fprintf(stdout, "Lightweight session and connection tracker and indexer.\n");
+    fprintf(stdout, "\n");
+}
+
 static void usage(const char *program_name) {
     fprintf(stdout, "\n");
     fprintf(stdout, "USAGE: %s [-options]\n", program_name);
     fprintf(stdout, "\n");
     fprintf(stdout, " General Options:\n");
     fprintf(stdout, "  -?             You're reading it.\n");
+    fprintf(stdout, "  -V             Version and compiled in options.\n");
     fprintf(stdout, "  -v             Verbose output.\n");
-//    fprintf(stdout, "  -V            Version and compiled in options.\n");
     fprintf(stdout, "  -i <iface>     Interface to sniff from.\n");
     fprintf(stdout, "  -f <format>    Output format line. See Format options.\n");
     fprintf(stdout, "  -b <bfp>       Berkley packet filter.\n");
@@ -883,7 +889,7 @@ static void usage(const char *program_name) {
     fprintf(stdout, "\n");
     fprintf(stdout, " Long Options:\n");
     fprintf(stdout, "  --help         Same as '?'\n");
-//    fprintf(stdout, "  --version     Same as 'V'\n");
+    fprintf(stdout, "  --version      Same as 'V'\n");
     fprintf(stdout, "  --interface    Same as 'i'\n");
     fprintf(stdout, "  --format       Same as 'f'\n");
     fprintf(stdout, "  --bpf          Same as 'b'\n");
@@ -911,6 +917,7 @@ int main(int argc, char *argv[]) {
    int long_option_index = 0;
    static struct option long_options[] = {
      {"help", 0, NULL, '?'},
+     {"version", 0, NULL, 'V'},
      {"interface", 1, NULL, 'i'},
      {"format", 1, NULL, 'f'},
      {"bpf", 1, NULL, 'b'},
@@ -930,7 +937,7 @@ int main(int argc, char *argv[]) {
    dev = "eth0";
    bpff = "";
    chroot_dir = "/tmp/";
-   output_format = "sguil";
+   output_format = "standard";
    cxtbuffer = NULL;
    cxtrackerid  = 0;
    dump_with_flush = inpacket = intr_flag = chroot_flag = 0;
@@ -966,6 +973,10 @@ int main(int argc, char *argv[]) {
          break;
       case '?':
          usage(argv[0]);
+         exit_clean(0);
+         break;
+      case 'V':
+         banner();
          exit_clean(0);
          break;
       case 'D':
@@ -1138,6 +1149,17 @@ int main(int argc, char *argv[]) {
       exit_clean(1);
    }
 
+   /* B0rk if we see an error... */
+   if (strlen(errbuf) > 0) {
+      printf("[*] Error errbuf: %s \n", errbuf);
+      exit_clean(1);
+   }
+
+   if(drop_privs_flag) {
+      printf("[*] Dropping privs...\n");
+      drop_privs();
+   }
+
    if ((pcap_compile(handle, &cfilter, bpff, 1 ,net_mask)) == -1) {
       printf("[*] Error pcap_compile user_filter: %s\n", pcap_geterr(handle));
       exit_clean(1);
@@ -1154,17 +1176,6 @@ int main(int argc, char *argv[]) {
       printf("[*] Writing traffic to %s%s.*, rolling every %d %s\n",
           dpath, dump_file_prefix, (int)roll_point, rollover_names[(int)roll_type]);
       dump_file_open();
-   }
-
-   /* B0rk if we see an error... */
-   if (strlen(errbuf) > 0) {
-      printf("[*] Error errbuf: %s \n", errbuf);
-      exit_clean(1);
-   }
-
-   if(drop_privs_flag) {
-      printf("[*] Dropping privs...\n\n");
-      drop_privs();
    }
 
    bucket_keys_NULL();
