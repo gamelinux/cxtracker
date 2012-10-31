@@ -31,7 +31,7 @@
 #endif /* __FreeBSD__ */
 
 /*  D E F I N E S  ************************************************************/
-#define VERSION                       "0.9.8.1"
+#define VERSION                       "0.9.8.2"
 #define TIMEOUT                       45
 #define BUCKET_SIZE                   65536
 #define SNAPLENGTH                    1600
