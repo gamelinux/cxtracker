@@ -146,7 +146,7 @@ void format_validate(const char *format)
     if ( strncmp(format, "standard", 8) == 0 || use_standard )
         format_qualified = strdup("%cxd|%stm|%etm|%dur|%pro|%sin|%spt|%din|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl");
     else if ( strncmp(format, "indexed", 7) == 0 )
-        format_qualified = strdup("%cxd|%stm|%etm|%dur|%pro|%sip|%spt|%dip|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl|%spf|%spo|%epf|%epo");
+        format_qualified = strdup("%cxd|%stm|%etm|%dur|%pro|%ver|%sip|%spt|%dip|%dpt|%spk|%sby|%dpk|%dby|%sfl|%dfl|%spf|%spo|%epf|%epo");
     else
         format_qualified = strdup(format);
 
