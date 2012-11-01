@@ -1118,7 +1118,7 @@ int main(int argc, char *argv[]) {
       if (dev == 0x0) dev = pcap_lookupdev(errbuf);
       printf("[*] Device: %s\n", dev);
 
-      if ((handle = pcap_create(dev, errbuf)) == NULL) {
+      if ((handle = pcap_open_live(dev, SNAPLENGTH, 1, 500, errbuf)) == NULL) {
          printf("[*] Error pcap_open_live: %s \n", errbuf);
          exit_clean(1);
       }
@@ -1192,11 +1192,6 @@ int main(int argc, char *argv[]) {
 
    roll_time_last = time(NULL);
 
-   if (pcap_set_buffer_size(handle, (16*1024*1024)) == 0 ) {
-       printf("[*] Default buffersize: %dMB\n",(16));
-   }
-
-   pcap_activate(handle);
    pcap_loop(handle,-1,got_packet,NULL);
 
    game_over();
