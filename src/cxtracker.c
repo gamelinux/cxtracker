@@ -613,21 +613,24 @@ void dump_active() {
 
 int dump_file_open()
 {
+   char dump_file_path[STDBUF];
 
    /* calculate filename */
    time_t now = time(NULL);
 
    memset(dump_file, 0, STDBUF);
+   snprintf(dump_file, STDBUF, "%s.%lu", dump_file_prefix, (long unsigned int) now);
 
    if ( dpath != NULL )
-      snprintf(dump_file, STDBUF, "%s%s.%lu", dpath, dump_file_prefix, (long unsigned int) now);
+      snprintf(dump_file_path, STDBUF, "%s%s.%lu", dpath, dump_file_prefix, (long unsigned int) now);
    else
-      snprintf(dump_file, STDBUF, "%s.%lu", dump_file_prefix, (long unsigned int) now);
+      snprintf(dump_file_path, STDBUF, "%s.%lu", dump_file_prefix, (long unsigned int) now);
+
 
    // TODO: check if destination file already exists
 
 
-   if ( (dump_handle=pcap_dump_open(handle, dump_file)) == NULL )
+   if ( (dump_handle=pcap_dump_open(handle, dump_file_path)) == NULL )
    {
       exit_clean(1);
    }
@@ -1115,7 +1118,7 @@ int main(int argc, char *argv[]) {
       if (dev == 0x0) dev = pcap_lookupdev(errbuf);
       printf("[*] Device: %s\n", dev);
 
-      if ((handle = pcap_open_live(dev, SNAPLENGTH, 1, 500, errbuf)) == NULL) {
+      if ((handle = pcap_create(dev, errbuf)) == NULL) {
          printf("[*] Error pcap_open_live: %s \n", errbuf);
          exit_clean(1);
       }
@@ -1188,6 +1191,12 @@ int main(int argc, char *argv[]) {
    }
 
    roll_time_last = time(NULL);
+
+   if (pcap_set_buffer_size(handle, (16*1024*1024)) == 0 ) {
+       printf("[*] Default buffersize: %dMB\n",(16));
+   }
+
+   pcap_activate(handle);
    pcap_loop(handle,-1,got_packet,NULL);
 
    game_over();
