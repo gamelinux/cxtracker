@@ -613,21 +613,24 @@ void dump_active() {
 
 int dump_file_open()
 {
+   char dump_file_path[STDBUF];
 
    /* calculate filename */
    time_t now = time(NULL);
 
    memset(dump_file, 0, STDBUF);
+   snprintf(dump_file, STDBUF, "%s.%lu", dump_file_prefix, (long unsigned int) now);
 
    if ( dpath != NULL )
-      snprintf(dump_file, STDBUF, "%s%s.%lu", dpath, dump_file_prefix, (long unsigned int) now);
+      snprintf(dump_file_path, STDBUF, "%s%s.%lu", dpath, dump_file_prefix, (long unsigned int) now);
    else
-      snprintf(dump_file, STDBUF, "%s.%lu", dump_file_prefix, (long unsigned int) now);
+      snprintf(dump_file_path, STDBUF, "%s.%lu", dump_file_prefix, (long unsigned int) now);
+
 
    // TODO: check if destination file already exists
 
 
-   if ( (dump_handle=pcap_dump_open(handle, dump_file)) == NULL )
+   if ( (dump_handle=pcap_dump_open(handle, dump_file_path)) == NULL )
    {
       exit_clean(1);
    }
