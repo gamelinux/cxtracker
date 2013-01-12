@@ -133,11 +133,11 @@ while (!eof(RFILE)) {
   if ($tproto == 6 && $PROTO == 6 ) {
      $BUFFER .= "$pktHdr$PKTBUFFER" if processTCPPkt($PKTBUFFER);
   } elsif ($tproto == 17 && $PROTO == 17 ) {
-     $BUFFER .= $pktHdr . $PKTBUFFER if processUDPPkt($PKTBUFFER);
+     $BUFFER .= "$pktHdr$PKTBUFFER" if processUDPPkt($PKTBUFFER);
   } elsif ($tproto == 1 && $PROTO == 1 ) {
-     $BUFFER .= $pktHdr . $PKTBUFFER if processICMPPkt($PKTBUFFER);
+     $BUFFER .= "$pktHdr$PKTBUFFER" if processICMPPkt($PKTBUFFER);
   } else {
-     $BUFFER .= $pktHdr . $PKTBUFFER if processANYPkt($PKTBUFFER);
+     $BUFFER .= "$pktHdr$PKTBUFFER" if processANYPkt($PKTBUFFER);
   }
   if (tell RFILE > $BE) {
      print "[*] Last byte position in READ reached ($BE)\n" if ($VERBOSE||$DEBUG);
