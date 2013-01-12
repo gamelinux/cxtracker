@@ -2,7 +2,7 @@
 # ----------------------------------------------------------------------
 # cxt2pcap.pl - Carve a session from a cxtracker indexed pcap
 #
-# Copyright (C) 2010-2011, Edward Fjellskål <edwardfjellskaal@gmail.com>
+# Copyright (C) 2010-2013, Edward Fjellskål <edwardfjellskaal@gmail.com>
 #                          Ian Firns        <firnsy@securixlive.com>
 #
 # This program is free software; you can redistribute it and/or modify
@@ -129,12 +129,15 @@ while (!eof(RFILE)) {
   # If IP - Check proto
   my $tproto = unpack("C", substr($PKTBUFFER, 23,1));
   print "[*] Processing a packet with protocol nr: $tproto\n" if $DEBUG;
-  if ($tproto == 6 && ($PROTO == 6 || $PROTO == "any")) {
+  # use switch/case instead!
+  if ($tproto == 6 && $PROTO == 6 ) {
      $BUFFER .= "$pktHdr$PKTBUFFER" if processTCPPkt($PKTBUFFER);
-  } elsif ($tproto == 17 && ($PROTO == 17 || $PROTO == "any")) {
+  } elsif ($tproto == 17 && $PROTO == 17 ) {
      $BUFFER .= $pktHdr . $PKTBUFFER if processUDPPkt($PKTBUFFER);
-  } elsif ($tproto == 1 && ($PROTO == 1 || $PROTO == "any")) {
+  } elsif ($tproto == 1 && $PROTO == 1 ) {
      $BUFFER .= $pktHdr . $PKTBUFFER if processICMPPkt($PKTBUFFER);
+  } else {
+     $BUFFER .= $pktHdr . $PKTBUFFER if processANYPkt($PKTBUFFER);
   }
   if (tell RFILE > $BE) {
      print "[*] Last byte position in READ reached ($BE)\n" if ($VERBOSE||$DEBUG);
@@ -201,7 +204,13 @@ sub processUDPPkt {
    my $dstip    = substr($pktBuf, 30,4);
    my $srcport  = substr($pktBuf, 34,2);
    my $dstport  = substr($pktBuf, 36,2);
-
+   my $binstr = "$srcip$srcport$dstip$dstport";
+   printSession ($binstr) if ($DEBUG || $VERBOSE);
+   my @B = unpack("C*", $binstr);
+   $srcip = "$B[0].$B[1].$B[2].$B[3]";
+   $dstip = "$B[6].$B[7].$B[8].$B[9]";
+   $srcport = $B[4]*256+$B[5];
+   $dstport = $B[10]*256+$B[11];
    if (( $srcip eq $SRC_IP && $dstip eq $DST_IP ) || ( $srcip eq $DST_IP && $dstip eq $SRC_IP )) {
       if (( $srcport eq $SRC_PORT && $dstport eq $DST_PORT ) || ( $srcport eq $DST_PORT && $dstport eq $SRC_PORT )) {
          print "[D] Got matching UDP packet\n" if $VERBOSE;
@@ -216,7 +225,28 @@ sub processICMPPkt {
    my $pktBuf   = shift;
    my $srcip    = substr($pktBuf, 26,4);
    my $dstip    = substr($pktBuf, 30,4);
+   #my $srcport  = 0; # change to icmp id/type?
+   #my $dstport  = 0; # change to icmp id/type?
+   my $binstr = "$srcip$dstip";
+   printSession ($binstr) if ($DEBUG || $VERBOSE);
+   my @B = unpack("C*", $binstr);
+   $srcip = "$B[0].$B[1].$B[2].$B[3]";
+   $dstip = "$B[4].$B[5].$B[6].$B[7]";
+   if (( $srcip eq $SRC_IP && $dstip eq $DST_IP ) || ( $srcip eq $DST_IP && $dstip eq $SRC_IP )) {
+      return 1;
+   }
+   return 0;
+}
 
+sub processANYPkt {
+   my $pktBuf   = shift;
+   my $srcip    = substr($pktBuf, 26,4);
+   my $dstip    = substr($pktBuf, 30,4);
+   my $binstr = "$srcip$dstip";
+   printSession ($binstr) if ($DEBUG || $VERBOSE);
+   my @B = unpack("C*", $binstr);
+   $srcip = "$B[0].$B[1].$B[2].$B[3]";
+   $dstip = "$B[4].$B[5].$B[6].$B[7]";
    if (( $srcip eq $SRC_IP && $dstip eq $DST_IP ) || ( $srcip eq $DST_IP && $dstip eq $SRC_IP )) {
       return 1;
    }
