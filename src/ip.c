@@ -25,12 +25,16 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#ifndef __FreeBSD__
+#include <error.h>
+#endif /* __FreeBSD__ */
+
 // #if !defined(__FreeBSD__) && !defined(__APPLE__)
 #ifndef __FreeBSD__ 
   #ifdef __APPLE__
     #include <mach/error.h>
   #else
-    #include <sys/error.h> 
+    #include <error.h> 
   #endif
 #endif
 

@@ -33,7 +33,7 @@
 /*  D E F I N E S  ************************************************************/
 #define VERSION                       "0.9.8.3"
 #define TIMEOUT                       45
-#define BUCKET_SIZE                   65536
+#define BUCKET_SIZE                   65536 /* Better, prime: 65537 */
 #define SNAPLENGTH                    1600
 
 #define MODE_DEV                      0x01
