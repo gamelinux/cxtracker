@@ -30,12 +30,12 @@ $ cxtracker -i eth1 -d /nsm_data/sensor1/session/ -D
 # Edit cxtracker2db.pl to match db user and password if needed.
 
 # Some files and dirs that should be writeable:
-mkdir /var/run/
-touch /var/log/cxtracker2db.log
+$ mkdir /var/run/
+$ touch /var/log/cxtracker2db.log
 
 # Prepare the mysql database
-GRANT USAGE ON *.* TO 'openfpc'@'localhost' identified by 'openfpc';
-GRANT ALL ON fpcgui.* TO 'openfpc'@'localhost' IDENTIFIED BY 'openfpc';
+GRANT USAGE ON *.* TO 'cxtracker'@'localhost' identified by 'cxtracker';
+GRANT ALL ON fpcgui.* TO 'cxtracker'@'localhost' IDENTIFIED BY 'cxtracker';
 FLUSH PRIVILEGES;
 
 CREATE DATABASE openfpc;
@@ -99,3 +99,5 @@ DELIMITER ;
 
 -----8<-----
 
+# Then:
+$ ./cxtracker2db.pl --hostname sensor1 --dir /nsm_data/sensor1/session/ --daemon
