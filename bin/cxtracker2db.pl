@@ -1,5 +1,10 @@
 #!/usr/bin/perl -w
-
+#
+# Copyright (C) 2010 - 2013, Edward Fjellskål <edward.fjellskaal@gmail.com>
+# Copyright (C) 2011 - 2013, Ian Firns <firnsy@securixlive.com>
+#
+# This file is a part of cxtracker: https://github.com/gamelinux/cxtracker
+#
 use strict;
 use warnings;
 use POSIX qw(setsid);

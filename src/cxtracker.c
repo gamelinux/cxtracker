@@ -3,6 +3,8 @@
 **
 ** Copyright (C) 2009, Redpill Linpro
 ** Copyright (C) 2009, Edward Fjellskål <edward.fjellskaal@redpill-linpro.com>
+** Copyright (C) 2010 - 2013, Edward Fjellskål <edward.fjellskaal@gmail.com>
+** Copyright (C) 2011 - 2013, Ian Firns <firnsy@securixlive.com>
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by

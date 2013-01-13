@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2011, Ian Firns <firnsy@securixlive.com>
+** Copyright (C) 2011 - 2013, Ian Firns <firnsy@securixlive.com>
 **
 **
 ** This program is free software; you can redistribute it and/or modify
