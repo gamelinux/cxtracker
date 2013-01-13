@@ -39,11 +39,11 @@ my  $SDIR          = "/nsm_data/$HOSTNAME/session/";
 my  $FDIR          = "$SDIR/failed/";
 my  $LOGFILE       = q(/var/log/cxtracker2db.log);
 my  $PIDFILE       = q(/var/run/cxtracker2db.pid);
-our $DB_NAME       = "openfpc";
+our $DB_NAME       = "cxtracker";
 our $DB_HOST       = "127.0.0.1";
 our $DB_PORT       = "3306";
-our $DB_USERNAME   = "openfpc";
-our $DB_PASSWORD   = "openfpc";
+our $DB_USERNAME   = "cxtracker";
+our $DB_PASSWORD   = "cxtracker";
 our $DBI           = "DBI:mysql:$DB_NAME:$DB_HOST:$DB_PORT";
 our $AUTOCOMMIT    = 0;
 my $SANCP_DB       = {};
@@ -54,6 +54,9 @@ GetOptions(
    'debug=s'       => \$DEBUG,
    'daemon'        => \$DAEMON,
 );
+
+check_dir($SDIR);
+check_dir($FDIR);
 
 # Signal handlers
 use vars qw(%sources);
@@ -85,7 +88,7 @@ if ( $DAEMON ) {
 }
 
 warn "[*] Connecting to database...\n";
-my $dbh = DBI->connect($DBI,$DB_USERNAME,$DB_PASSWORD, {RaiseError => 1}) or die "$DBI::errstr";
+my $dbh = DBI->connect($DBI,$DB_USERNAME,$DB_PASSWORD, {RaiseError => 1, mysql_auto_reconnect=>1}) or die "$DBI::errstr";
 # Make todays table, and initialize the session merged table
 setup_db();
 
@@ -389,7 +392,7 @@ sub new_session_table {
         INDEX dst_port (dst_port),                         \
         INDEX src_port (src_port),                         \
         INDEX start_time (start_time)                      \
-        )                                                  \
+        ) ENGINE=MyISAM                                    \
       ";
       $sth = $dbh->prepare($sql);
       $sth->execute;
@@ -484,7 +487,7 @@ sub merge_session_tables {
       INDEX dst_port (dst_port),                         \
       INDEX src_port (src_port),                         \
       INDEX start_time (start_time)                      \
-      ) TYPE=MERGE UNION=($tables)                       \
+      ) ENGINE=MERGE UNION=($tables)                     \
       ";
       $sth = $dbh->prepare($sql);
       $sth->execute;
@@ -545,6 +548,34 @@ sub recreate_merge_table {
    my $sessiontables = find_session_tables();
    delete_merged_session_table();
    merge_session_tables($sessiontables);
+}
+
+=head2
+
+ Checks sanity of Dirs
+
+=cut
+
+sub check_dir {
+   my $DIR = shift;
+   if (-e $DIR) {
+      print "[*] The directory $DIR exists.\n" if $DEBUG;
+   } else {
+      print "[E] ERROR: The directory $DIR does not exist!\n";
+      exit 1;
+   }
+   if (-r $DIR) {
+      print "[*] The directory $DIR is readable.\n" if $DEBUG;
+   } else {
+      print "[E] ERROR: The directory $DIR is not readable!\n";
+      exit 1;
+   }
+   if (-w $DIR) {
+      print "[*] The directory $DIR is writable.\n" if $DEBUG;
+   } else {
+      print "[E] ERROR: The directory $DIR is not writable!\n";
+      exit 1;
+   }
 }
 
 =head2 game_over
