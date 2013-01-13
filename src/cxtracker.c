@@ -871,8 +871,11 @@ static int go_daemon() {
 }
 
 static void banner() {
-    fprintf(stdout, "cxtracker - v%s\n", VERSION);
-    fprintf(stdout, "Lightweight session and connection tracker and indexer.\n");
+    fprintf(stdout, "\n");
+    fprintf(stdout, " cxtracker - v%s\n", VERSION);
+    fprintf(stdout, " - The lightweight network connection tracker,\n");
+    fprintf(stdout, "   packet logger and packet indexer!\n\n");
+    fprintf(stdout, " Using %s\n", pcap_lib_version());
     fprintf(stdout, "\n");
 }
 
@@ -962,7 +965,7 @@ int main(int argc, char *argv[]) {
    signal(SIGHUP,  dump_active);
    signal(SIGALRM, set_end_sessions);
 
-   while( (ch=getopt_long(argc, argv, "?b:d:DT:f:g:i:p:P:r:u:vw:s:t:", long_options, &long_option_index)) != EOF )
+   while( (ch=getopt_long(argc, argv, "?b:d:DT:f:g:i:p:P:r:u:vVw:s:t:", long_options, &long_option_index)) != EOF )
      switch (ch) {
       case 'i':
          dev = strdup(optarg);
