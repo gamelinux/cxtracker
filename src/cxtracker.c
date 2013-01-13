@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <libgen.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <pcap.h>
@@ -490,8 +491,15 @@ void cxtbuffer_write () {
    next = NULL;
    FILE *cxtFile;
    char cxtfname[4096];
+   char *bname;
 
-   sprintf(cxtfname, "%sstats.%s.%ld", dpath, dev, tstamp.tv_sec);
+   if (mode == MODE_FILE) {
+       bname = strdup(basename(read_file));
+       sprintf(cxtfname, "%sstats.%s.%ld", dpath, bname, tstamp.tv_sec);
+       free(bname);
+   } else {
+       sprintf(cxtfname, "%sstats.%s.%ld", dpath, dev, tstamp.tv_sec);
+   }
    cxtFile = fopen(cxtfname, "w");
 
    if (cxtFile == NULL) {
