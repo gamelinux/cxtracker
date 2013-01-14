@@ -35,11 +35,11 @@ $ touch /var/log/cxtracker2db.log
 
 # Prepare the mysql database
 GRANT USAGE ON *.* TO 'cxtracker'@'localhost' identified by 'cxtracker';
-GRANT ALL ON fpcgui.* TO 'cxtracker'@'localhost' IDENTIFIED BY 'cxtracker';
+GRANT ALL ON cxtracker.* TO 'cxtracker'@'localhost' IDENTIFIED BY 'cxtracker';
 FLUSH PRIVILEGES;
 
-CREATE DATABASE openfpc;
-\u openfpc
+CREATE DATABASE cxtracker;
+\u cxtracker
 
 # You need to add two function to mysql to handle IPv6 
 # INET_ATON6 and INET_NTOA6:
