@@ -10,6 +10,7 @@ use warnings;
 use POSIX qw(setsid);
 use DateTime;
 use Getopt::Long qw/:config auto_version auto_help/;
+use Sys::Hostname;
 use DBI;
 
 =head1 NAME
@@ -18,7 +19,7 @@ cxtracker2db.pl - Load session metadata from cxtracker into a db
 
 =head1 VERSION
 
-0.1
+0.2
 
 =head1 SYNOPSIS
 
@@ -32,16 +33,19 @@ cxtracker2db.pl - Load session metadata from cxtracker into a db
  --debug        : enable debug messages (default: 0 (disabled))
  --help         : this help message
  --version      : show cxtracker2db.pl version
+ --format       : "indexed" or "standard" database format
 
 =cut
 
-our $VERSION       = 0.1;
+our $VERSION       = 0.2;
 our $DEBUG         = 0;
 our $DAEMON        = 0;
+our $FORMAT        = "any";
+our $INPUTFORMAT   = 0;
 our $TIMEOUT       = 5;
-our $HOSTNAME      = q(localhost);
-my  $SDIR          = "/nsm_data/$HOSTNAME/session/";
-my  $FDIR          = "$SDIR/failed/";
+our $HOSTNAME      = hostname;
+my  $SDIR          = "";
+my  $FDIR          = "";
 my  $LOGFILE       = q(/var/log/cxtracker2db.log);
 my  $PIDFILE       = q(/var/run/cxtracker2db.pid);
 our $DB_NAME       = "cxtracker";
@@ -58,7 +62,15 @@ GetOptions(
    'hostname=s'    => \$HOSTNAME,
    'debug=s'       => \$DEBUG,
    'daemon'        => \$DAEMON,
+   'format=s'      => \$FORMAT
 );
+
+if ($SDIR eq "") {
+   $SDIR = "/nsm_data/$HOSTNAME/session/";
+   $FDIR = "$SDIR/failed";
+} else {
+   $FDIR = "$SDIR/failed";
+}
 
 check_dir($SDIR);
 check_dir($FDIR);
@@ -149,7 +161,7 @@ sub get_session {
    my $result = 0;
    my %signatures;
    if (open (FILE, $SFILE)) {
-      print "Found session file: ".$SFILE."\n" if $DEBUG;
+      print "[*] Found session file: ".$SFILE."\n" if $DEBUG;
       # Verify the data in the session files
       LINE:
       while (my $line = readline FILE) {
@@ -160,13 +172,55 @@ sub get_session {
             next LINE;
          }
          my @elements = split/\|/,$line;
-         unless(@elements == 15) {
+         if (@elements == 15) {
+            if ($FORMAT eq "indexed") {
+             warn "[*] Error: Not valid Nr. of session args for format: '$FORMAT' in: '$SFILE'";
+             next LINE;
+            } elsif ($INPUTFORMAT == 0) {
+               $INPUTFORMAT = 1;
+               if ($FORMAT eq "any") {
+                  #the user gave us no guidance on format
+                  #we are now getting guidance from the
+                  #input file for the first time
+                  #construct the db accordingly
+                  #as it had previously been waiting on this.
+                  $FORMAT = "standard";
+                  setup_db();
+               }
+            }
+         } elsif (@elements == 20) {
+            if ($FORMAT eq "standard") {
+               if($INPUTFORMAT == 0) {
+                  $INPUTFORMAT = 2;
+               }
+               #warn "[*] Reading indexed input as standard in: '$SFILE'";
+            } elsif ($INPUTFORMAT == 0) {
+               $INPUTFORMAT = 2;
+               if ($FORMAT eq "any") {
+                  #the user gave us no guidance on format
+                  #we are now getting guidance from the
+                  #input file for the first time
+                  #construct the db accordingly
+                  #as it had previously been waiting on this.
+                  my $tablename = get_table_name();
+                  my $tableformat = check_table_format($tablename);
+                  #check if we need to roll indexed or standard
+                  if($tableformat == 1) {
+                     $FORMAT = "standard";
+                  } else {
+                     $FORMAT = "indexed";
+                  }
+                  #$FORMAT = "indexed";
+                  setup_db();
+               }
+            }
+         } else {
             warn "[*] Error: Not valid Nr. of session args format in: '$SFILE'";
             next LINE;
          }
          # Things should be OK now to send to the DB
          $result = put_session2db($line);
-    }
+      }
       close FILE;
    }
    return $result;
@@ -307,36 +361,69 @@ sub put_session2db {
    }
 
    my( $cx_id, $s_t, $e_t, $tot_time, $ip_type, $src_dip, $src_port,
-       $dst_dip, $dst_port, $src_packets, $src_byte, $dst_packets, $dst_byte, 
-       $src_flags, $dst_flags) = split /\|/, $SESSION, 15;
+       $dst_dip, $dst_port, $src_packets, $src_byte, $dst_packets, $dst_byte,
+       $src_flags, $dst_flags, $ip_versionb, $s_file, $s_byte,
+       $e_file, $e_byte) = split /\|/, $SESSION, 20;
 
-  if ( ip_is_ipv6($src_dip) || ip_is_ipv6($dst_dip) ) {
+   if ( ip_is_ipv6($src_dip) || ip_is_ipv6($dst_dip) ) {
       $src_dip = expand_ipv6($src_dip);
       $dst_dip = expand_ipv6($dst_dip);
       $src_dip = "INET_ATON6(\'$src_dip\')";
       $dst_dip = "INET_ATON6(\'$dst_dip\')";
       $ip_version = 10; # AF_INET6
-  }
+   } else {
+      if ($INPUTFORMAT == 2) {
+         $src_dip = "INET_ATON(\'$src_dip\')";
+         $dst_dip = "INET_ATON(\'$dst_dip\')";
+      }
+   }
 
    my ($sql, $sth);
-   eval{
 
-      $sql = qq[                                                 
-             INSERT INTO $tablename (                           
-                sid,sessionid,start_time,end_time,duration,ip_proto, 
-                src_ip,src_port,dst_ip,dst_port,src_pkts,src_bytes,
-                dst_pkts,dst_bytes,src_flags,dst_flags,ip_version
-             ) VALUES (                                         
-                '$HOSTNAME','$cx_id','$s_t','$e_t','$tot_time',
-                '$ip_type',$src_dip,'$src_port',$dst_dip,'$dst_port',
-                '$src_packets','$src_byte','$dst_packets','$dst_byte',
-                '$src_flags','$dst_flags','$ip_version'
-             )];
+   if ($FORMAT eq "standard") {
+      eval{
 
-      $sth = $dbh->prepare($sql);
-      $sth->execute;
-      $sth->finish;
-   };
+         $sql = qq[                                                 
+                INSERT INTO $tablename (                           
+                   sid,sessionid,start_time,end_time,duration,ip_proto, 
+                   src_ip,src_port,dst_ip,dst_port,src_pkts,src_bytes,
+                   dst_pkts,dst_bytes,src_flags,dst_flags,ip_version
+                ) VALUES (                                         
+                   '$HOSTNAME','$cx_id','$s_t','$e_t','$tot_time',
+                   '$ip_type',$src_dip,'$src_port',$dst_dip,'$dst_port',
+                   '$src_packets','$src_byte','$dst_packets','$dst_byte',
+                   '$src_flags','$dst_flags','$ip_version'
+                )];
+
+         $sth = $dbh->prepare($sql);
+         $sth->execute;
+         $sth->finish;
+      };
+   }
+
+   if ($FORMAT eq "indexed") {
+      eval{
+
+         $sql = qq[                                                 
+                INSERT INTO $tablename (                           
+                   sid,sessionid,start_time,end_time,duration,ip_proto, 
+                   src_ip,src_port,dst_ip,dst_port,src_pkts,src_bytes,
+                   dst_pkts,dst_bytes,src_flags,dst_flags,ip_version,
+                   s_file,s_byte,e_file,e_byte
+                ) VALUES (                                         
+                   '$HOSTNAME','$cx_id','$s_t','$e_t','$tot_time',
+                   '$ip_type',$src_dip,'$src_port',$dst_dip,'$dst_port',
+                   '$src_packets','$src_byte','$dst_packets','$dst_byte',
+                   '$src_flags','$dst_flags','$ip_version','$s_file',
+                   '$s_byte','$e_file','$e_byte'
+                )];
+
+         $sth = $dbh->prepare($sql);
+         $sth->execute;
+         $sth->finish;
+      };
+   }
+
    if ($@) {
       # Failed
       return 1;
@@ -353,11 +440,70 @@ sub put_session2db {
 
 sub setup_db {
    my $tablename = get_table_name();
+   my $tableformat = check_table_format($tablename);
+   print "[*] tableformat: $tableformat\n" if $DEBUG;
+   my $sessiontables = find_session_tables();              #
+   print "[*] session tables: $sessiontables\n" if $DEBUG;
+   if ($sessiontables) {
+       if(($tableformat == 2) && ($FORMAT eq "standard")) {
+           die("[E] ERROR: Database Format mismatch!\n");
+        }
+        if(($tableformat == 1) && ($FORMAT eq "indexed")) {
+           die("[E] ERROR: Database format mismatch!\n");
+        }
+        if(($tableformat == 0) && ($FORMAT eq "any")) {
+           if ($INPUTFORMAT == 0) {
+               #there's neither input nor argument
+               #to specify what kind.
+               #and therefor no harm in waiting.
+               return;
+           }
+           if ($INPUTFORMAT == 1) {
+               $FORMAT = "standard";
+           }
+           if ($INPUTFORMAT == 2) {
+               $FORMAT = "indexed";
+           }
+       }
+   }
+
    new_session_table($tablename);
    delete_merged_session_table();
-   my $sessiontables = find_session_tables();
+   $sessiontables = find_session_tables();
+   print "[*] session tables2: $sessiontables\n" if $DEBUG;
    merge_session_tables($sessiontables);
    return;
+}
+
+=head2 check_table_format
+
+ Checks to see if table is indexed.  Returns 1 if table is standard, 
+ 2 if table is indexed, 0 if table does not exist.
+
+=cut
+
+sub check_table_format {
+   my ($tablename) = shift;
+   my $tableformat = 0;
+
+   if(checkif_table_exist($tablename)) {
+       my ($sql, $sth);
+#      $sql = "SHOW COLUMNS FROM $tablename LIKE 's_file'";
+       $sql = "SELECT * FROM $tablename WHERE 1=0";
+       $sth = $dbh->prepare($sql);
+       $sth->execute;
+#      my $tester = $sth->{'NAME'};
+       my $cols = @{$sth->{NAME}}; # or NAME_lc if needed 
+       print "[*] cols = $cols\n" if $DEBUG;
+#      print "\n tester = $tester \n";
+       if($cols == 21) {
+           $tableformat = 2;
+       }
+       else {
+           $tableformat = 1;
+       }
+   }
+   return $tableformat;
 }
 
 =head2 new_session_table
@@ -370,39 +516,83 @@ sub setup_db {
 sub new_session_table {
    my ($tablename) = shift;
    my ($sql, $sth);
-   eval{
-      $sql = "                                             \
-        CREATE TABLE IF NOT EXISTS $tablename              \
-        (                                                  \
-        sid           INT(10) UNSIGNED           NOT NULL, \
-        sessionid     BIGINT(20) UNSIGNED        NOT NULL, \
-        start_time    DATETIME                   NOT NULL, \
-        end_time      DATETIME                   NOT NULL, \
-        duration      INT(10) UNSIGNED           NOT NULL, \
-        ip_proto      TINYINT UNSIGNED           NOT NULL, \
-        ip_version    TINYINT UNSIGNED           NOT NULL, \
-        src_ip        DECIMAL(39,0) UNSIGNED,              \
-        src_port      SMALLINT UNSIGNED,                   \
-        dst_ip        DECIMAL(39,0) UNSIGNED,              \
-        dst_port      SMALLINT UNSIGNED,                   \
-        src_pkts      INT UNSIGNED               NOT NULL, \
-        src_bytes     INT UNSIGNED               NOT NULL, \
-        dst_pkts      INT UNSIGNED               NOT NULL, \
-        dst_bytes     INT UNSIGNED               NOT NULL, \
-        src_flags     TINYINT UNSIGNED           NOT NULL, \
-        dst_flags     TINYINT UNSIGNED           NOT NULL, \
-        PRIMARY KEY (sid,sessionid),                       \
-        INDEX src_ip (src_ip),                             \
-        INDEX dst_ip (dst_ip),                             \
-        INDEX dst_port (dst_port),                         \
-        INDEX src_port (src_port),                         \
-        INDEX start_time (start_time)                      \
-        ) ENGINE=MyISAM                                    \
+
+   return 0 if ($FORMAT eq "any");
+
+   if ($FORMAT eq "standard") {
+       warn "[*] Creating standard session table\n" if $DEBUG;
+       $sql = "                                             \
+         CREATE TABLE IF NOT EXISTS $tablename              \
+         (                                                  \
+         sid           INT(10) UNSIGNED           NOT NULL, \
+         sessionid     BIGINT(20) UNSIGNED        NOT NULL, \
+         start_time    DATETIME                   NOT NULL, \
+         end_time      DATETIME                   NOT NULL, \
+         duration      INT(10) UNSIGNED           NOT NULL, \
+         ip_proto      TINYINT UNSIGNED           NOT NULL, \
+         src_ip        DECIMAL(39,0) UNSIGNED,              \
+         src_port      SMALLINT UNSIGNED,                   \
+         dst_ip        DECIMAL(39,0) UNSIGNED,              \
+         dst_port      SMALLINT UNSIGNED,                   \
+         src_pkts      INT UNSIGNED               NOT NULL, \
+         src_bytes     INT UNSIGNED               NOT NULL, \
+         dst_pkts      INT UNSIGNED               NOT NULL, \
+         dst_bytes     INT UNSIGNED               NOT NULL, \
+         src_flags     TINYINT UNSIGNED           NOT NULL, \
+         dst_flags     TINYINT UNSIGNED           NOT NULL, \
+         ip_version    TINYINT UNSIGNED           NOT NULL, \
+         PRIMARY KEY (sid,sessionid),                       \
+         INDEX src_ip (src_ip),                             \
+         INDEX dst_ip (dst_ip),                             \
+         INDEX dst_port (dst_port),                         \
+         INDEX src_port (src_port),                         \
+         INDEX start_time (start_time)                      \
+         ) ENGINE=MyISAM                                    \
       ";
+   }
+
+   if ($FORMAT eq "indexed") {
+      warn "[*] Creating indexed session table\n" if $DEBUG;
+      $sql = "                                              \
+         CREATE TABLE IF NOT EXISTS $tablename              \
+         (                                                  \
+         sid           INT(10) UNSIGNED           NOT NULL, \
+         sessionid     BIGINT(20) UNSIGNED        NOT NULL, \
+         start_time    DATETIME                   NOT NULL, \
+         end_time      DATETIME                   NOT NULL, \
+         duration      INT(10) UNSIGNED           NOT NULL, \
+         ip_proto      TINYINT UNSIGNED           NOT NULL, \
+         src_ip        DECIMAL(39,0) UNSIGNED,              \
+         src_port      SMALLINT UNSIGNED,                   \
+         dst_ip        DECIMAL(39,0) UNSIGNED,              \
+         dst_port      SMALLINT UNSIGNED,                   \
+         src_pkts      INT UNSIGNED               NOT NULL, \
+         src_bytes     INT UNSIGNED               NOT NULL, \
+         dst_pkts      INT UNSIGNED               NOT NULL, \
+         dst_bytes     INT UNSIGNED               NOT NULL, \
+         src_flags     TINYINT UNSIGNED           NOT NULL, \
+         dst_flags     TINYINT UNSIGNED           NOT NULL, \
+         ip_version    TINYINT UNSIGNED           NOT NULL, \
+         s_file        VARCHAR(15)                NOT NULL, \
+         s_byte        BIGINT UNSIGNED            NOT NULL, \
+         e_file        VARCHAR(15)                NOT NULL, \
+         e_byte        BIGINT UNSIGNED            NOT NULL, \
+         PRIMARY KEY (sid,sessionid),                       \
+         INDEX src_ip (src_ip),                             \
+         INDEX dst_ip (dst_ip),                             \
+         INDEX dst_port (dst_port),                         \
+         INDEX src_port (src_port),                         \
+         INDEX start_time (start_time)                      \
+         ) ENGINE=MyISAM                                    \
+      ";
+   }
+
+   eval{
       $sth = $dbh->prepare($sql);
       $sth->execute;
       $sth->finish;
    };
+
    if ($@) {
       # Failed
       return 1;
@@ -428,7 +618,7 @@ sub find_session_tables {
    }
    $sth->finish;
    $tables =~ s/,$//;
-   return $tables;;
+   return $tables;
 }
 
 =head2 delete_merged_session_table
@@ -463,10 +653,14 @@ sub delete_merged_session_table {
 sub merge_session_tables {
    my $tables = shift;
    my ($sql, $sth);
-   eval {
-      # check for != MRG_MyISAM - exit
-      warn "[*] Creating session MERGE table\n" if $DEBUG;
-      my $sql = "                                        \
+
+   return 0 if ($FORMAT eq "any");
+   
+   # Maybe check for != MRG_MyISAM - then exit
+
+   if ($FORMAT eq "standard") {
+      warn "[*] Creating standard session MERGE table\n" if $DEBUG;
+      $sql = "                                           \
       CREATE TABLE session                               \
       (                                                  \
       sid           INT(0) UNSIGNED            NOT NULL, \
@@ -494,6 +688,44 @@ sub merge_session_tables {
       INDEX start_time (start_time)                      \
       ) ENGINE=MERGE UNION=($tables)                     \
       ";
+   }
+   if ($FORMAT eq "indexed") {
+      warn "[*] Creating indexed session MERGE table\n" if $DEBUG;
+      $sql = "                                              \
+      CREATE TABLE session                                  \
+      (                                                     \
+         sid           INT(10) UNSIGNED           NOT NULL, \
+         sessionid     BIGINT(20) UNSIGNED        NOT NULL, \
+         start_time    DATETIME                   NOT NULL, \
+         end_time      DATETIME                   NOT NULL, \
+         duration      INT(10) UNSIGNED           NOT NULL, \
+         ip_proto      TINYINT UNSIGNED           NOT NULL, \
+         src_ip        DECIMAL(39,0) UNSIGNED,              \
+         src_port      SMALLINT UNSIGNED,                   \
+         dst_ip        DECIMAL(39,0) UNSIGNED,              \
+         dst_port      SMALLINT UNSIGNED,                   \
+         src_pkts      INT UNSIGNED               NOT NULL, \
+         src_bytes     INT UNSIGNED               NOT NULL, \
+         dst_pkts      INT UNSIGNED               NOT NULL, \
+         dst_bytes     INT UNSIGNED               NOT NULL, \
+         src_flags     TINYINT UNSIGNED           NOT NULL, \
+         dst_flags     TINYINT UNSIGNED           NOT NULL, \
+         ip_version    TINYINT UNSIGNED           NOT NULL, \
+         s_file        VARCHAR(15)                NOT NULL, \
+         s_byte        BIGINT UNSIGNED            NOT NULL, \
+         e_file        VARCHAR(15)                NOT NULL, \
+         e_byte        BIGINT UNSIGNED            NOT NULL, \
+         PRIMARY KEY (sid,sessionid),                       \
+         INDEX src_ip (src_ip),                             \
+         INDEX dst_ip (dst_ip),                             \
+         INDEX dst_port (dst_port),                         \
+         INDEX src_port (src_port),                         \
+         INDEX start_time (start_time)                      \
+      ) ENGINE=MERGE UNION=($tables)                        \
+      ";
+   }
+
+   eval {
       $sth = $dbh->prepare($sql);
       $sth->execute;
       $sth->finish;
