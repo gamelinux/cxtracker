@@ -42,8 +42,9 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <ctype.h>
+#include <sys/statvfs.h>
+#include <dirent.h>
 #include "cxtracker.h"
-
 #include "format.h"
 
 /*  G L O B A L E S  **********************************************************/
@@ -65,10 +66,12 @@ static char  *pidfile = "cxtracker.pid";
 static char  *pidpath = "/var/run";
 static int   verbose, inpacket, intr_flag, use_syslog, dump_with_flush;
 static int   mode;
+static char  datedir = 0;
 static char  *read_file;
 static uint64_t  read_file_offset = 0;
 
 static uint64_t roll_size;
+static uint64_t roll_off_size = 0;
 static time_t   roll_time;
 static time_t   roll_time_last;
 static uint64_t  dump_file_offset = 0;
@@ -98,8 +101,89 @@ void set_end_sessions();
 int dump_file_open();
 int dump_file_roll();
 int dump_file_close();
+int pcap_roll_off();
+int pcap_roll_off_recursive();
 
+int pcap_roll_off()
+{
+   /*rolling off is set*/
+	/*do we need to roll?*/
+	struct statvfs mystatvfs;
+	if(!statvfs(dpath, &mystatvfs))
+	{
+		/*we can look at the partition*/
+		if((mystatvfs.f_bavail) < (roll_off_size / (mystatvfs.f_bsize)))
+		{
+			pcap_roll_off_recursive(dpath, STDBUF);
+			return 0;
+		}
+		else 
+		{
+			/*we can't look at the partition*/
+			return 1;
+		}
+	}
+	return 1;
+}
 
+int pcap_roll_off_recursive(char dirpath[], int len)
+{
+	struct dirent **mydirs;
+	int h = 0;
+	int i = 0;
+	int direxists = 0;
+	int smallest = -1;
+	time_t mymtime = 0;
+	h = scandir(dirpath, &mydirs, NULL, alphasort);
+	if (h < 0)
+		perror("scandir");
+
+	else
+	{
+		for(i = 0; i < h; i++)
+		{
+			if((mydirs[i]->d_type == DT_DIR) && ((strncmp(mydirs[i]->d_name,".",2)!=0) && (strncmp(mydirs[i]->d_name,"..",3)!=0)))
+			{
+				char pathname[len];
+				snprintf(pathname, len, "%s%s/", dirpath, mydirs[i]->d_name);
+				pcap_roll_off_recursive(pathname, len);
+				rmdir(pathname);
+				direxists = 1;
+			}
+			else
+			{
+				if(direxists == 0)
+				{
+					char unlinkname[len];
+					snprintf(unlinkname, len, "%s/%s", dirpath, mydirs[i]->d_name);
+					struct stat mystat;
+					stat(unlinkname, &mystat);
+					if((mymtime > (mystat.st_mtime)) || (mymtime == 0))
+					{
+						if((strncmp(mydirs[i]->d_name,".",2)!=0) && (strncmp(mydirs[i]->d_name,"..",3)!=0) && (strncmp(mydirs[i]->d_name,"stats.",6)!=0))
+						{
+							/*New smallest file*/
+							smallest = i;
+							mymtime = mystat.st_mtime;
+						}
+					}
+				}
+			}
+		}
+		if(smallest!=-1)
+		{
+			/*got oldest file, unlink*/
+			char unlinkname[len];
+			snprintf(unlinkname, len, "%s/%s", dirpath, mydirs[smallest]->d_name);
+			unlink(unlinkname);
+			for (i = 0; i < h; i++)
+				free(mydirs[i]);
+			free(mydirs);
+			return 0;
+		}
+	}
+	return 1;
+}
 
 
 void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char *packet) {
@@ -130,6 +214,11 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          printf("Rolling on size.\n");
          dump_file_roll();
       }
+	/* TODO */
+	/*check if we should roll off disk*/
+	if(roll_off_size) 
+		pcap_roll_off();
+	/* /TODO */
 
       /* write the packet */
       pcap_dump((u_char *)dump_handle, pheader, packet);
@@ -624,18 +713,60 @@ void dump_active() {
 int dump_file_open()
 {
    char dump_file_path[STDBUF];
-
+   char dump_dir_path[STDBUF];
+   char datepath[] = "0000-00-00/";
    /* calculate filename */
    time_t now = time(NULL);
 
    memset(dump_file, 0, STDBUF);
    snprintf(dump_file, STDBUF, "%s.%lu", dump_file_prefix, (long unsigned int) now);
+	
+	/*implement date-based directories*/
+	if (datedir)
+	{
+		/*datedir is set*/
+		struct tm * timeptr;
+		timeptr = gmtime(&now);
+
+		//char datepath[] = "0000-00-00/";
+
+		snprintf(datepath, 12, "%4d-%02d-%02d/",  (1900 + (int)(timeptr->tm_year)),(1+(int)(timeptr->tm_mon)),((int)(timeptr->tm_mday)));
+
+	}
 
    if ( dpath != NULL )
-      snprintf(dump_file_path, STDBUF, "%s%s.%lu", dpath, dump_file_prefix, (long unsigned int) now);
+   {
+	if(datedir)
+	{
+		snprintf(dump_dir_path, STDBUF, "%s%s", dpath, datepath);
+		snprintf(dump_file_path, STDBUF, "%s%s.%lu", dump_dir_path, dump_file_prefix, (long unsigned int) now);
+		if(mkdir(dump_dir_path, (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)))
+		{
+			if(errno != EEXIST)
+			{
+				exit_clean(1); //"Directory cannot be created!"				
+			}
+		}
+	}
+	else
+		snprintf(dump_file_path, STDBUF, "%s%s.%lu", dpath, dump_file_prefix, (long unsigned int) now);
+   }
    else
-      snprintf(dump_file_path, STDBUF, "%s.%lu", dump_file_prefix, (long unsigned int) now);
-
+   {
+	if(datedir)
+	{
+		snprintf(dump_file_path, STDBUF, "%s%s.%lu", datepath, dump_file_prefix, (long unsigned int) now);
+		if(mkdir(datepath, (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)))
+		{
+			if(errno != EEXIST)
+			{
+				exit_clean(1); //"Directory cannot be created!"				
+			}
+		}
+	}
+	else
+		snprintf(dump_file_path, STDBUF, "%s.%lu", dump_file_prefix, (long unsigned int) now);
+   }
 
    // TODO: check if destination file already exists
 
@@ -902,6 +1033,8 @@ static void usage(const char *program_name) {
     fprintf(stdout, "  -F             Flush output after every write to dump file.\n");
     fprintf(stdout, "  -s <bytes>     Roll over dump file based on size.\n");
     fprintf(stdout, "  -t <interval>  Roll over dump file based on time intervals.\n");
+    fprintf(stdout, "  -x <bytes>     Amount of space to leave free on disk.\n");
+    fprintf(stdout, "  -A             Write packets to directories by date (YYYY-MM-DD)\n");
     fprintf(stdout, "\n");
     fprintf(stdout, " Long Options:\n");
     fprintf(stdout, "  --help         Same as '?'\n");
@@ -926,8 +1059,11 @@ int main(int argc, char *argv[]) {
    char *bpff, errbuf[PCAP_ERRBUF_SIZE];
    extern char *optarg;
    char roll_metric = 0;
+   char roll_off_metric = 0;
    char roll_type = GIGABYTES;
+   //char roll_off_type = GIGABYTES;
    size_t roll_point = 2;
+   size_t roll_off = 0;
    roll_size = roll_point * GIGABYTE;
 
    int long_option_index = 0;
@@ -965,7 +1101,7 @@ int main(int argc, char *argv[]) {
    signal(SIGHUP,  dump_active);
    signal(SIGALRM, set_end_sessions);
 
-   while( (ch=getopt_long(argc, argv, "?b:d:DT:f:g:i:p:P:r:u:vVw:s:t:", long_options, &long_option_index)) != EOF )
+   while( (ch=getopt_long(argc, argv, "?b:d:DT:f:g:i:p:P:r:u:vVw:s:t:x:A", long_options, &long_option_index)) != EOF )
      switch (ch) {
       case 'i':
          dev = strdup(optarg);
@@ -1077,8 +1213,36 @@ int main(int argc, char *argv[]) {
                printf("[*] Invalid size metric: %c\n", roll_metric ? roll_metric : '-');
                break;
          }
+	break;
+      case 'x':
+         sscanf(optarg, "%zu%c", &roll_off, &roll_off_metric);
 
+         switch( tolower(roll_off_metric) ) {
+            case 'k':
+               roll_off_size = roll_off * KILOBYTE;
+               //roll_off_type = KILOBYTES;
+               break;
+            case 'm':
+               roll_off_size = roll_off * MEGABYTE;
+               //roll_off_type = MEGABYTES;
+               break;
+            case 'g':
+               roll_off_size = roll_off * GIGABYTE;
+               //roll_off_type = GIGABYTES;
+               break;
+            case 't':
+               roll_off_size = roll_off * TERABYTE;
+               //roll_off_type = TERABYTES;
+               break;
+            default:
+               printf("[*] Invalid size metric: %c\n", roll_metric ? roll_metric : '-');
+               break;
+         }
+	break;
+      case 'A':
+         datedir = 1;
          break;
+
       default:
          exit_clean(1);
          break;
