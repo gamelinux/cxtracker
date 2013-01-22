@@ -1352,10 +1352,19 @@ int main(int argc, char *argv[]) {
    }
 
    // set up dump mode now as appropriate
-   if (mode & MODE_DUMP ) {
-      printf("[*] Writing traffic to %s%s.*, rolling every %d %s\n",
-          dpath, dump_file_prefix, (int)roll_point, rollover_names[(int)roll_type]);
-      dump_file_open();
+   if (mode & MODE_DUMP )
+   {
+	   if (datedir)
+	   {
+		      printf("[*] Writing traffic to %s%s/%s.*, rolling every %d %s\n",
+			      dpath, "YYYY-MM-DD", dump_file_prefix, (int)roll_point, rollover_names[(int)roll_type]);
+	   }
+	   else
+	   {
+		      printf("[*] Writing traffic to %s%s.*, rolling every %d %s\n",
+			      dpath, dump_file_prefix, (int)roll_point, rollover_names[(int)roll_type]);
+	   }
+           dump_file_open();
    }
 
    bucket_keys_NULL();
