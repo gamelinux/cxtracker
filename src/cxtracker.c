@@ -109,13 +109,15 @@ int pcap_roll_off()
    /*rolling off is set*/
 	/*do we need to roll?*/
 	struct statvfs mystatvfs;
-	if(!statvfs(dpath, &mystatvfs))
+	while(1)
 	{
-		/*we can look at the partition*/
-		if((mystatvfs.f_bavail) < (roll_off_size / (mystatvfs.f_bsize)))
+		if(!statvfs(dpath, &mystatvfs))
 		{
-			pcap_roll_off_recursive(dpath, STDBUF);
-			return 0;
+			/*we can look at the partition*/
+			if((mystatvfs.f_bavail) > (roll_off_size / (mystatvfs.f_bsize)))
+				return 0;
+			if(pcap_roll_off_recursive(dpath, STDBUF))
+				return 1;
 		}
 		else 
 		{
@@ -123,7 +125,7 @@ int pcap_roll_off()
 			return 1;
 		}
 	}
-	return 1;
+	return 0;
 }
 
 int pcap_roll_off_recursive(char dirpath[], int len)
@@ -131,13 +133,12 @@ int pcap_roll_off_recursive(char dirpath[], int len)
 	struct dirent **mydirs;
 	int h = 0;
 	int i = 0;
-	int direxists = 0;
 	int smallest = -1;
+	int direxists = -1;
 	time_t mymtime = 0;
 	h = scandir(dirpath, &mydirs, NULL, alphasort);
 	if (h < 0)
 		perror("scandir");
-
 	else
 	{
 		for(i = 0; i < h; i++)
@@ -146,26 +147,27 @@ int pcap_roll_off_recursive(char dirpath[], int len)
 			{
 				char pathname[len];
 				snprintf(pathname, len, "%s%s/", dirpath, mydirs[i]->d_name);
-				pcap_roll_off_recursive(pathname, len);
+				if(pcap_roll_off_recursive(pathname, len))
+					return 1;
 				rmdir(pathname);
 				direxists = 1;
 			}
-			else
+		}
+		for(i = 0; i < h; i++)
+		{
+			if(!(mydirs[i]->d_type == DT_DIR) && ((strncmp(mydirs[i]->d_name,".",2)!=0) && (strncmp(mydirs[i]->d_name,"..",3)!=0)))
 			{
-				if(direxists == 0)
+				char unlinkname[len];
+				snprintf(unlinkname, len, "%s/%s", dirpath, mydirs[i]->d_name);
+				struct stat mystat;
+				stat(unlinkname, &mystat);
+				if((mymtime > (mystat.st_mtime)) || (mymtime == 0))
 				{
-					char unlinkname[len];
-					snprintf(unlinkname, len, "%s/%s", dirpath, mydirs[i]->d_name);
-					struct stat mystat;
-					stat(unlinkname, &mystat);
-					if((mymtime > (mystat.st_mtime)) || (mymtime == 0))
+					if((strncmp(mydirs[i]->d_name,".",2)!=0) && (strncmp(mydirs[i]->d_name,"..",3)!=0) && (strncmp(mydirs[i]->d_name,"stats.",6)!=0))
 					{
-						if((strncmp(mydirs[i]->d_name,".",2)!=0) && (strncmp(mydirs[i]->d_name,"..",3)!=0) && (strncmp(mydirs[i]->d_name,"stats.",6)!=0))
-						{
-							/*New smallest file*/
-							smallest = i;
-							mymtime = mystat.st_mtime;
-						}
+						/*New oldest file / smallest mtime*/
+						smallest = i;
+						mymtime = mystat.st_mtime;
 					}
 				}
 			}
@@ -175,12 +177,15 @@ int pcap_roll_off_recursive(char dirpath[], int len)
 			/*got oldest file, unlink*/
 			char unlinkname[len];
 			snprintf(unlinkname, len, "%s/%s", dirpath, mydirs[smallest]->d_name);
+			printf("Maximum disk usage reached; removing: %s\n", unlinkname);
 			unlink(unlinkname);
 			for (i = 0; i < h; i++)
 				free(mydirs[i]);
 			free(mydirs);
 			return 0;
 		}
+		if(direxists > 0)
+			return 0;
 	}
 	return 1;
 }
@@ -203,6 +208,9 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          roll_time_last = now;
          printf("Rolling on time.\n");
          dump_file_roll();
+	if(roll_off_size) 
+		if(pcap_roll_off())
+			exit_clean(1); /*error*/
       }
 
       dump_file_offset = (uint64_t)ftell((FILE *)dump_handle);
@@ -213,12 +221,15 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
       {
          printf("Rolling on size.\n");
          dump_file_roll();
-      }
-	/* TODO */
-	/*check if we should roll off disk*/
 	if(roll_off_size) 
-		pcap_roll_off();
-	/* /TODO */
+		if(pcap_roll_off())
+			exit_clean(1); /*error*/
+      }
+	/*check if we should roll off disk*/
+	/*if(roll_off_size) 
+		pcap_roll_off();*/
+	/*moved to right after dump_file_roll();*/	
+
 
       /* write the packet */
       pcap_dump((u_char *)dump_handle, pheader, packet);
