@@ -1362,6 +1362,17 @@ int main(int argc, char *argv[]) {
       pcap_freecode(&cfilter); // filter code not needed after setfilter
    }
 
+   /*go ahead and check disk space and prune if needed*/
+   if(roll_off_size)
+   {
+	roll_off_size += roll_size;
+	/*set roll_off_size up by roll_size
+	this should help prevent overstepping max disk usage*/
+	/*prune*/
+	if(pcap_roll_off())
+		exit_clean(1); /*error*/
+   }
+
    // set up dump mode now as appropriate
    if (mode & MODE_DUMP )
    {
