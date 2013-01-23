@@ -183,6 +183,10 @@ int pcap_roll_off_recursive(char dirpath[], int len)
 			free(mydirs);
 			return 0;
 		}
+		if(h>2)
+			return 1; /*directory has stuff in it we can't delete*/
+		else
+			return 0; /*directory is empty and should be deleted*/
 	}
 	return 1;
 }
@@ -1374,7 +1378,7 @@ int main(int argc, char *argv[]) {
 	/*prune*/
 	if(pcap_roll_off())
 	{
-		printf("Error pruning pcaps from disk.\n");
+		printf("[*] Error pruning pcaps from disk.\n");
 		exit_clean(1); /*error*/
 	}
    }
