@@ -207,7 +207,10 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          dump_file_roll();
 	if(roll_off_size) 
 		if(pcap_roll_off())
+		{
+			printf("Error pruning pcaps from disk.\n");
 			exit_clean(1); /*error*/
+		}
       }
 
       dump_file_offset = (uint64_t)ftell((FILE *)dump_handle);
@@ -220,7 +223,10 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
          dump_file_roll();
 	if(roll_off_size) 
 		if(pcap_roll_off())
+		{
+			printf("Error pruning pcaps from disk.\n");
 			exit_clean(1); /*error*/
+		}
       }
 	/*check if we should roll off disk*/
 	/*if(roll_off_size) 
@@ -1367,7 +1373,10 @@ int main(int argc, char *argv[]) {
 	this should help prevent overstepping max disk usage*/
 	/*prune*/
 	if(pcap_roll_off())
+	{
+		printf("Error pruning pcaps from disk.\n");
 		exit_clean(1); /*error*/
+	}
    }
 
    // set up dump mode now as appropriate
