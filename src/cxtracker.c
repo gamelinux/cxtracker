@@ -81,6 +81,20 @@ static char     dump_file[STDBUF];
 //uint64_t        cxt_alloc = 0;
 //uint64_t        cxt_free  = 0;
 
+static char *rollover_names[] = {
+  "unknown",
+
+  "kilobytes",
+  "megabytes",
+  "gigabytes",
+  "terabytes",
+
+  "seconds",
+  "minutes",
+  "hours",
+  "days"
+};
+
 ip_config_t  ip_config;
 
 
