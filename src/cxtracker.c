@@ -157,7 +157,7 @@ int pcap_roll_off_recursive(char dirpath[], int len)
 			if(!(mydirs[i]->d_type == DT_DIR) && ((strncmp(mydirs[i]->d_name,".",2)!=0) && (strncmp(mydirs[i]->d_name,"..",3)!=0)))
 			{
 				char unlinkname[len];
-				snprintf(unlinkname, len, "%s/%s", dirpath, mydirs[i]->d_name);
+				snprintf(unlinkname, len, "%s%s", dirpath, mydirs[i]->d_name);
 				struct stat mystat;
 				stat(unlinkname, &mystat);
 				if((mymtime > (mystat.st_mtime)) || (mymtime == 0))
@@ -175,7 +175,7 @@ int pcap_roll_off_recursive(char dirpath[], int len)
 		{
 			/*got oldest file, unlink*/
 			char unlinkname[len];
-			snprintf(unlinkname, len, "%s/%s", dirpath, mydirs[smallest]->d_name);
+			snprintf(unlinkname, len, "%s%s", dirpath, mydirs[smallest]->d_name);
 			printf("Maximum disk usage reached; removing: %s\n", unlinkname);
 			unlink(unlinkname);
 			for (i = 0; i < h; i++)
