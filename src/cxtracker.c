@@ -134,7 +134,6 @@ int pcap_roll_off_recursive(char dirpath[], int len)
 	int h = 0;
 	int i = 0;
 	int smallest = -1;
-	int direxists = -1;
 	time_t mymtime = 0;
 	h = scandir(dirpath, &mydirs, NULL, alphasort);
 	if (h < 0)
@@ -150,7 +149,7 @@ int pcap_roll_off_recursive(char dirpath[], int len)
 				if(pcap_roll_off_recursive(pathname, len))
 					return 1;
 				rmdir(pathname);
-				direxists = 1;
+				return 0;
 			}
 		}
 		for(i = 0; i < h; i++)
@@ -184,8 +183,6 @@ int pcap_roll_off_recursive(char dirpath[], int len)
 			free(mydirs);
 			return 0;
 		}
-		if(direxists > 0)
-			return 0;
 	}
 	return 1;
 }
