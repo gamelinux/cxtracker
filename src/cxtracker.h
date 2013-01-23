@@ -354,18 +354,6 @@ typedef enum {
   DAYS
 } rollover_type;
 
-static char *rollover_names[] = {
-  "unknown",
 
-  "kilobytes",
-  "megabytes",
-  "gigabytes",
-  "terabytes",
-
-  "seconds",
-  "minutes",
-  "hours",
-  "days"
-};
 
 #endif /* __CXTRACKER_H__ */
