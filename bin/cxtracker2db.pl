@@ -68,9 +68,9 @@ GetOptions(
 
 if ($SDIR eq "") {
    $SDIR = "/nsm_data/$HOSTNAME/session/";
-   $FDIR = "$SDIR/failed";
+   $FDIR = "$SDIR/failed/";
 } else {
-   $FDIR = "$SDIR/failed";
+   $FDIR = "$SDIR/failed/";
 }
 
 check_dir($SDIR);
