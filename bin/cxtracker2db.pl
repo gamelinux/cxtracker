@@ -40,6 +40,7 @@ cxtracker2db.pl - Load session metadata from cxtracker into a db
 our $VERSION       = 0.2;
 our $DEBUG         = 0;
 our $DAEMON        = 0;
+our $NOT_ESTABLISHED = 1;
 our $FORMAT        = "any";
 our $INPUTFORMAT   = 0;
 our $TIMEOUT       = 5;
@@ -364,6 +365,16 @@ sub put_session2db {
        $dst_dip, $dst_port, $src_packets, $src_byte, $dst_packets, $dst_byte,
        $src_flags, $dst_flags, $ip_versionb, $s_file, $s_byte,
        $e_file, $e_byte) = split /\|/, $SESSION, 20;
+
+   if ( $NOT_ESTABLISHED && $ip_type == 6 ) {
+      if ( $tot_time <= 1 ) { # Do we need this ?
+         if ( $src_packets == 0 || $dst_packets == 0 ) { # What if a reset is sent?
+            # $src_flags & $dst_flags ?
+            warn "Skipping record: Only established TCP sessions are recorded\n" if $DEBUG;
+            return 0;
+         }
+      }
+   }
 
    if ( ip_is_ipv6($src_dip) || ip_is_ipv6($dst_dip) ) {
       $src_dip = expand_ipv6($src_dip);
