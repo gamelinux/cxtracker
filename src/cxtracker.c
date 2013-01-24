@@ -156,7 +156,7 @@ int pcap_roll_off_recursive(char dirpath[], int len)
 	{
 		for(i = 0; i < h; i++)
 		{
-			if((mydirs[i]->d_type == DT_DIR) && ((strncmp(mydirs[i]->d_name,".",2)!=0) && (strncmp(mydirs[i]->d_name,"..",3)!=0)))
+			if((mydirs[i]->d_type == DT_DIR) && ((strncmp(mydirs[i]->d_name,".",2)!=0) && (strncmp(mydirs[i]->d_name,"..",3)!=0) && (strncmp(mydirs[i]->d_name,"failed",7)!=0)))
 			{
 				char pathname[len];
 				snprintf(pathname, len, "%s%s/", dirpath, mydirs[i]->d_name);
