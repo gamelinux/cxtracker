@@ -6,9 +6,6 @@
 $ sudo aptitude install libnet-pcap-perl libgetopt-long-descriptive-perl git-core libdatetime-perl libpcap0.8
 $ git clone git://github.com/gamelinux/cxtracker.git
 
-# PERL
-$ sudo perl cxtracker/sbin/cxtracker.pl --help
-
 # C
 $ cd cxtracker/src/
 $ make
@@ -22,14 +19,13 @@ $ cxtracker -i eth1 -d /nsm_data/sensor1/session/ -D
 # Just make sure that the sguil sancp agent is picking
 # up session files from the right location.
 
-
 ##   IF YOU WANT TO PUT SESSION DATA INTO A DB   ##
  # Maybe for your own project or for openfpc etc.#
 
 # cxtracker2db.pl - for storing session data to a DB
 # Edit cxtracker2db.pl to match db user and password if needed.
 
-# Some files and dirs that should be writeable:
+# Some files and dirs that should be writable:
 $ mkdir /var/run/
 $ touch /var/log/cxtracker2db.log
 
@@ -78,7 +74,7 @@ BEGIN
   DECLARE q DECIMAL(39) UNSIGNED DEFAULT 0;
   DECLARE r INT                  DEFAULT 0;
   WHILE i DO
-    -- DIV doesn't work with nubers > bigint
+    -- DIV doesn't work with numbers > bigint
     SET q := FLOOR(n / 65536);
     SET r := n MOD 65536;
     SET n := q;
