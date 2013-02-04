@@ -29,7 +29,7 @@ cxtracker2db.pl - Load session metadata from cxtracker into a db
 
  --dir          : set the dir to monitor for session files
  --daemon       : enables daemon mode
- --hostname     : spesify the hostname
+ --hostname     : specify the hostname
  --debug        : enable debug messages (default: 0 (disabled))
  --help         : this help message
  --version      : show cxtracker2db.pl version
