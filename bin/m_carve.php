@@ -154,7 +154,8 @@ function mergeFiles($outFiles){
 		unlink($file);
 	}
 
-	$handle = fopen('/tmp/multicarve_results/'.$id.'_output.pcap', "r");	
+	$handle = fopen('/tmp/multicarve_results/'.$id.'_output.pcap', "r");
+	return $handle	
 }
 
 //define command line arguments
@@ -184,19 +185,15 @@ if($options["a"]=="yes"){
 	$date = date("Y-m-d", $unixTime[1]);
 	$dir=$options["dir"].$date."/";
 	$direc =$options["dir"].$date."/";
-	print "YOU IS HERE!\n";
   }
 else{
 	$dir = $options["dir"];
 	$direc = $options["dir"].$date."/";
-	print "YOU AINT HERE!\n";
   }
 
 $start = $options["sfile"];
 $stop  = $options["efile"];
 $pre   = $options["pre"];
-
-var_dump($options);
 
 //get files to search
 $files2search = carve($start,$stop,$dir,$pre);
@@ -206,5 +203,7 @@ $file_sizes = get_sizes($files2search,$dir,$pre);
 //construct and call cxt2pcap searches, return generated outfiles
 $outputfiles = cxt2pcap($files2search,$file_sizes,$options,$direc);
 //take generated outfiles and merge them into one pcap
-mergeFiles($outputfiles);
+$fileHandle = mergeFiles($outputfiles);
+//return file handle to the file merged pcap file
+return $fileHandle;
 
