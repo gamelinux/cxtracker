@@ -1,8 +1,11 @@
+#!/usr/bin/php
 <?php
 # ----------------------------------------------------------------------
 # m_carve.php - Perform extraction of flows spanning multiple files
 #
+# Copyright (C) 2013
 # Evan Stuart <evan.stuart@gtri.gatech.edu>
+# 
 #                     
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,14 +29,15 @@ function carve($start, $stop, $dir, $pre){
 		//tokenize start and end file name by (.)
 		$start_token = explode(".",$start);
 		$stop_token  = explode(".",$stop);
+		
 		//check to make sure file is in (prefix).(suffix) format (size 2)
-		if(count($start_token)!=2 or count($stop_token)!=2){
+		if(count($start_token)!=3 or count($stop_token)!=3){
 			print "Invalid file name format, must be two strings separated by a period (eg. cxt.12345)\n";
 		}
 		else{
 			//assign start and end timestamp
-			$start_tstamp = $start_token[1];
-			$stop_tstamp  = $stop_token[1];
+			$start_tstamp = $start_token[2];
+			$stop_tstamp  = $stop_token[2];
 			//store capture directory contents into variable
 			$dircontents = list_dir($dir,$pre);
 			//extract since it was passed from list_dir function
@@ -54,7 +58,6 @@ function carve($start, $stop, $dir, $pre){
 		}
 	
 	//sort results and return array
-	//print "Searched ".count($dircontents)." files and found ".count($carve_results)." matching search criteria:\n";
 	sort($carve_results);
 	return $carve_results;
 }
@@ -65,28 +68,33 @@ function list_dir($directory,$pre){
 
 	$directory = $directory;
 	$open_directory = opendir($directory);
+	$valid_files=array();
 	while($filename = readdir($open_directory)){
 		$filesplit = explode(".", $filename);
-		$check_prefix = $filesplit[0];
-		if($check_prefix==$pre){						
-			$valid_files[] = $filesplit[1];
+		
+		$check_prefix = $filesplit[0] .".". $filesplit[1];
+		if($check_prefix==$pre or $check_prefix == "openfpc-Default_Node.pcap"){						
+			$valid_files[] = $filesplit[2];
 		}
 	}
 	closedir();
 	return $valid_files;
 }
 
+
+
 //Takes sorted list of files, the directory they are located in and the prefix of the 
 //file name as arguments and retrieves each file's size and stores it in an array
 function get_sizes($files_array,$dir,$pre){
 
+	//var_dump($files_array);
 	for($i=0;$i<count($files_array);$i++){
 		$postfix = $files_array[$i];
 		$size =filesize("$dir"."$pre"."."."$postfix");
-
+		//print "Size: ".$size;
 		$size_array[$i] = $size;
-
 	}
+
 	return $size_array;
 
 }
@@ -121,7 +129,8 @@ function cxt2pcap($files2search,$file_sizes,$options,$direc){
 							' --dst-ip '.$options["destip"].
 							' --src-port '.$options["srcport"].
 						    ' --dst-port '.$options["destport"].
-						    ' --proto '.$options["proto"];
+						    ' --proto '.$options["proto"].
+						    ' --ipversion '.$options["ip-version"];
 						    //if its the first file set -s to provided start offset
 						    if($i==0){
 						    	$search_string.= " -s ".$options["s"];
@@ -137,10 +146,8 @@ function cxt2pcap($files2search,$file_sizes,$options,$direc){
 							else{
 								$search_string.= " -e ".$file_sizes[$i];
 							}
-			$command = 'perl cxt2pcap.pl '.$search_string;
-			exec($command,$out);	
-			print "Output for out".$j.": ".$out[$i]."\n";
-			
+			$command = 'perl /home/xubuntu/Desktop/cxtracker/bin/cxt2pcap.pl '.$search_string;
+			exec($command,$out);				
 			$j++;
 	}
 	return $outFiles;
@@ -154,7 +161,7 @@ function mergeFiles($outFiles){
 	for($i=0; $i < count($outFiles);$i++){
 		$file = $outFiles[$i];
 		if(!file_exists($file)){
-			print "ERROR!!\n";
+			print "ERRORz!!\n";
 		}
 		else{
 		$fileString.=" ".$outFiles[$i];
@@ -173,7 +180,7 @@ function mergeFiles($outFiles){
 	}
 
 	$handle = fopen('/tmp/multicarve_results/'.$id.'_output.pcap', "r");
-	return $handle	
+	return $handle;
 }
 
 //define command line arguments
@@ -208,10 +215,13 @@ else{
 	$dir = $options["dir"];
 	$direc = $options["dir"].$date."/";
   }
-
+// $dir = $options["dir"];
+// $direc = $options["dir"]; //.$date."/";
 $start = $options["sfile"];
 $stop  = $options["efile"];
 $pre   = $options["pre"];
+
+//var_dump($options);
 
 //get files to search
 $files2search = carve($start,$stop,$dir,$pre);
@@ -222,6 +232,9 @@ $file_sizes = get_sizes($files2search,$dir,$pre);
 $outputfiles = cxt2pcap($files2search,$file_sizes,$options,$direc);
 //take generated outfiles and merge them into one pcap
 $fileHandle = mergeFiles($outputfiles);
-//return file handle to the file merged pcap file
-return $fileHandle;
-
+//return file handle of the merged pcap file
+$meta_data = stream_get_meta_data($fileHandle);
+$filename = $meta_data["uri"];
+print $filename;
+return $filename;
+?>
