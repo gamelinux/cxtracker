@@ -60,7 +60,7 @@ my $DEBUG             = 0;
 my $VERBOSE           = 0;
 
 my ($R_PCAP, $W_PCAP, $BPF, $BS, $BE, $FH_PCAP) = qq();
-my ($SRC_IP, $DST_IP, $SRC_PORT, $DST_PORT, $PROTO) = qq(any);
+my ($SRC_IP, $DST_IP, $SRC_PORT, $DST_PORT, $PROTO, $IP_VERS) = qq(any);
 
 use constant SEEK_SET  => 0;
 use constant SEEK_CUR  => 1;
@@ -71,6 +71,7 @@ Getopt::Long::GetOptions(
     'r=s'                    => \$R_PCAP,
     'w=s'                    => \$W_PCAP,
     'proto=s'                => \$PROTO,
+    'ipversion=s'      => \$IP_VERS,
     'src-ip=s'               => \$SRC_IP,
     'dst-ip=s'               => \$DST_IP,
     'src-port=s'             => \$SRC_PORT,
@@ -130,6 +131,9 @@ while (!eof(RFILE)) {
   my $tproto = unpack("C", substr($PKTBUFFER, 23,1));
   print "[*] Processing a packet with protocol nr: $tproto\n" if $DEBUG;
   # use switch/case instead!
+  if ($IP_VERS == 10) {
+     $BUFFER .= "$pktHdr$PKTBUFFER" if processIPvSixPkt($PKTBUFFER);
+  }
   if ($tproto == 6 && $PROTO == 6 ) {
      $BUFFER .= "$pktHdr$PKTBUFFER" if processTCPPkt($PKTBUFFER);
   } elsif ($tproto == 17 && $PROTO == 17 ) {
@@ -232,6 +236,25 @@ sub processICMPPkt {
    my @B = unpack("C*", $binstr);
    $srcip = "$B[0].$B[1].$B[2].$B[3]";
    $dstip = "$B[4].$B[5].$B[6].$B[7]";
+   if (( $srcip eq $SRC_IP && $dstip eq $DST_IP ) || ( $srcip eq $DST_IP && $dstip eq $SRC_IP )) {
+      return 1;
+   }
+   return 0;
+}
+
+sub processIPvSixPkt {
+   my $pktBuf   = shift;
+   my $srcip    = substr($pktBuf, 22,16);
+   my $dstip    = substr($pktBuf, 38,16);
+   my $binstr = "$srcip$dstip";
+   printSession ($binstr) if ($DEBUG || $VERBOSE);
+   my @B = unpack("C*", $binstr);
+   foreach (@B)
+   {
+    $_ = sprintf("%02x", $_);
+   }
+   $srcip = "$B[0]$B[1]:$B[2]$B[3]:$B[4]$B[5]:$B[6]$B[7]:$B[8]$B[9]:$B[10]$B[11]:$B[12]$B[13]:$B[14]$B[15]";
+   $dstip = "$B[16]$B[17]:$B[18]$B[19]:$B[20]$B[21]:$B[22]$B[23]:$B[24]$B[25]:$B[26]$B[27]:$B[28]$B[29]:$B[30]$B[31]";
    if (( $srcip eq $SRC_IP && $dstip eq $DST_IP ) || ( $srcip eq $DST_IP && $dstip eq $SRC_IP )) {
       return 1;
    }

@@ -34,7 +34,7 @@
 #define VERSION                       "0.9.8.4"
 #define TIMEOUT                       45
 #define BUCKET_SIZE                   65537
-#define SNAPLENGTH                    1600
+#define SNAPLENGTH                    65535
 
 #define MODE_DEV                      0x01
 #define MODE_FILE                     0x02
@@ -354,18 +354,6 @@ typedef enum {
   DAYS
 } rollover_type;
 
-static char *rollover_names[] = {
-  "unknown",
 
-  "kilobytes",
-  "megabytes",
-  "gigabytes",
-  "terabytes",
-
-  "seconds",
-  "minutes",
-  "hours",
-  "days"
-};
 
 #endif /* __CXTRACKER_H__ */

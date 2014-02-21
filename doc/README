@@ -3,14 +3,14 @@
 # Connection Tracker - is a passive network connection tracker 
 #
 
-# Baut'
+# About
 CxTracker (Connection Tracker) is a passive network connection tracker 
 for profiling, history, auditing and network discovery. It can be used 
-as an replacement for sancp in the sguil setup. It handles vlan (2 layers)
+as an replacement for sancp in the sguil setup. It handles VLANs (2 layers)
 and IPv6 out of the box.
 
 # As is!
-This program is served 'as is'. We take no responsabuility for anything :)
+This program is served 'as is'. We take no responsibility for anything :)
 
 # Install
 See INSTALL
@@ -26,18 +26,29 @@ Usage:
 
      OPTIONS:
 
-     -i             : network device (default: eth0)
-     -b             : berkeley packet filter
-     -d             : directory to dump sessions files in
-     -u             : user
-     -g             : group
-     -D             : enables daemon mode
-     -h             : this help message
-     -v             : verbose
-#     -V             : show cxtracker.pl version
+     -?             Help
+     -V             Version and compiled in options.
+     -v             Verbose output.
+     -i <iface>     Interface to sniff from.
+     -f <format>    Output format line. See Format options.
+     -b <bfp>       Berkley packet filter.
+     -d <dir>       Directory to write session files to.
+     -D             Enable daemon mode.
+     -u <user>      User to drop priveleges to after daemonising.
+     -g <group>     Group to drop priveleges to after daemonising.
+     -T <dir>       Direct to chroot into.
+     -P <path>      Path to PID file (/var/run).
+     -p <file>      Name of pidfile (cxtracker.pid).
+     -r <pcap>      PCAP file to read.
+     -w <name>      Dump PCAP to file with specified prefix.
+     -F             Flush output after every write to dump file.
+     -s <bytes>     Roll over dump file based on size.
+     -t <interval>  Roll over dump file based on time intervals.
+     -x <bytes>     Amount of space to leave free on disk.
+     -A             Write packets to directories by date (YYYY-MM-DD)
 
 # Example
-Running cxtracker in forground:
+Running cxtracker in foreground:
  Only IPv4 traffic:
  ./cxtracker -d /nsm_data/sensor1/sancp -u nsm -g nsm -i eth1 -b 'ip'
 
@@ -46,33 +57,3 @@ Running cxtracker in forground:
 
  vlan and IPv4 and IPv6:
  ./cxtracker -d /nsm_data/sensor1/sancp -u nsm -g nsm -i eth1
-
-
-
-### cxtracker.pl (The perl version) Just a proofe of concept..
-### Dont use in prod :)
-Currently you can use it just to see or record your connections on
-your network.
-See '$ cxtracker.pl --help' for updated info
-cxtracker.pl --help
-Usage:
-     $ cxtracker.pl [options]
-
-     OPTIONS:
-
-     --dev|-d       : network device (default: eth0)
-     --sguil        : enables sguil output and sets output dir
-     --daemon       : enables daemon mode
-     --debug        : enable debug messages (default: 0 (disabled))
-     --help         : this help message
-     --version      : show cxtracker.pl version
-
-# Examples
-To just try out and see whats going on on your network (wlan0):
-$ ./cxtracker.pl --dev wlan0
-
-To have it work with sguil, sending it to daemon world, using eth0:
-$ ./cxtracker.pl --dev eth0 --daemon --sguil /sguil_data/`hostname -s`/sancp/
-
-
-
