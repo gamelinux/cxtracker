@@ -276,6 +276,12 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
       eth_type = ntohs(eth_hdr->eth_8_ip_type);
       eth_header_len +=4;
       vlanid = ntohs(eth_hdr->eth_8_vid);
+      if ( eth_type == ETHERNET_TYPE_8021Q ) {
+        /* printf("[*] ETHERNET TYPE 8021Q in 8021Q\n"); */
+        eth_type = ntohs(eth_hdr->eth_82_ip_type);
+        eth_header_len +=4;
+        vlanid = ntohs(eth_hdr->eth_82_vid);
+      }
    }
 
    else if ( eth_type == (ETHERNET_TYPE_802Q1MT|ETHERNET_TYPE_802Q1MT2|ETHERNET_TYPE_802Q1MT3|ETHERNET_TYPE_8021AD) ) {
