@@ -464,7 +464,7 @@ void format_write(FILE *fd, const connection *cxt)
 
 void format_write_cxid(FILE *fd, const connection *cxt, const char *prefix)
 {
-    fprintf(fd, "%s%ld%09ju", prefix, cxt->start_time.tv_sec, cxt->cxid);
+    fprintf(fd, "%s%ld%09ju", prefix, (long) cxt->start_time.tv_sec, cxt->cxid);
 }
 
 void format_write_time_start(FILE *fd, const connection *cxt, const char *prefix)
@@ -485,12 +485,12 @@ void format_write_utime_start(FILE *fd, const connection *cxt, const char *prefi
 
 void format_write_unixtime_start(FILE *fd, const connection *cxt, const char *prefix)
 {
-    fprintf(fd, "%s%lu", prefix, cxt->start_time.tv_sec);
+    fprintf(fd, "%s%lu", prefix, (long) cxt->start_time.tv_sec);
 }
 
 void format_write_unixutime_start(FILE *fd, const connection *cxt, const char *prefix)
 {
-    fprintf(fd, "%s%lu.%lu", prefix, cxt->start_time.tv_sec, cxt->start_time.tv_usec);
+    fprintf(fd, "%s%lu.%lu", prefix, (long) cxt->start_time.tv_sec, (long) cxt->start_time.tv_usec);
 }
 
 void format_write_time_end(FILE *fd, const connection *cxt, const char *prefix)
@@ -511,17 +511,17 @@ void format_write_utime_end(FILE *fd, const connection *cxt, const char *prefix)
 
 void format_write_unixtime_end(FILE *fd, const connection *cxt, const char *prefix)
 {
-    fprintf(fd, "%s%lu", prefix, cxt->last_pkt_time.tv_sec);
+    fprintf(fd, "%s%lu", prefix, (long) cxt->last_pkt_time.tv_sec);
 }
 
 void format_write_unixutime_end(FILE *fd, const connection *cxt, const char *prefix)
 {
-    fprintf(fd, "%s%lu.%lu", prefix, cxt->last_pkt_time.tv_sec, cxt->last_pkt_time.tv_usec);
+    fprintf(fd, "%s%lu.%lu", prefix, (long) cxt->last_pkt_time.tv_sec, (long) cxt->last_pkt_time.tv_usec);
 }
 
 void format_write_time_duration(FILE *fd, const connection *cxt, const char *prefix)
 {
-    fprintf(fd, "%s%ld", prefix, cxt->last_pkt_time.tv_sec - cxt->start_time.tv_sec);
+    fprintf(fd, "%s%ld", prefix, (long) (cxt->last_pkt_time.tv_sec - cxt->start_time.tv_sec));
 }
 
 void format_write_ip_family(FILE *fd, const connection *cxt, const char *prefix)

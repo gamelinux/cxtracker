@@ -210,7 +210,9 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
    if ( intr_flag != 0 ) { check_interupt(); }
    inpacket = 1;
 
-   tstamp = pheader->ts;
+   tstamp.tv_sec = (long) pheader->ts.tv_sec;
+   tstamp.tv_usec = (long) pheader->ts.tv_usec;
+   /* tstamp = pheader->ts; */
 
    /* are we dumping */
    if (mode & MODE_DUMP) {
@@ -624,10 +626,10 @@ void cxtbuffer_write () {
 
    if (mode == MODE_FILE) {
        bname = strdup(basename(read_file));
-       sprintf(cxtfname, "%sstats.%s.%ld", dpath, bname, tstamp.tv_sec);
+       snprintf(cxtfname, sizeof(cxtfname), "%sstats.%s.%ld", dpath, bname, (long) tstamp.tv_sec);
        free(bname);
    } else {
-       sprintf(cxtfname, "%sstats.%s.%ld", dpath, dev, tstamp.tv_sec);
+       snprintf(cxtfname, sizeof(cxtfname), "%sstats.%s.%ld", dpath, dev, (long) tstamp.tv_sec);
    }
    cxtFile = fopen(cxtfname, "w");
 

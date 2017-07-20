@@ -25,8 +25,8 @@
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <netdb.h>
-
-#ifdef __FreeBSD__
+#include <sys/param.h>
+#ifdef BSD
 #include <sys/socket.h>
 #endif /* __FreeBSD__ */
 
