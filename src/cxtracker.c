@@ -379,7 +379,6 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
    /* } */
 }
 
-inline
 int cx_track(ip_t *ip_src, uint16_t src_port,ip_t *ip_dst, uint16_t dst_port,
                uint8_t ip_proto, uint32_t p_bytes, uint8_t tcpflags,struct timeval tstamp, int af) {
 
@@ -775,7 +774,7 @@ int dump_file_open()
 
 	}
 
-   if ( dpath != NULL )
+   if ( strcmp(dpath, "./") == 0 )
    {
 	if(datedir)
 	{
@@ -1039,7 +1038,7 @@ int daemonize() {
 }
 
 static int go_daemon() {
-    return daemonize(NULL);
+    return daemonize();
 }
 
 static void banner() {

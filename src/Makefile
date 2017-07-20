@@ -1,5 +1,4 @@
 #Makefile
-CC=gcc
 
 OCFLAGS=-g -O3 -Wall -Wextra
 DCFLAGS=-g
