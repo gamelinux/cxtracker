@@ -774,7 +774,7 @@ int dump_file_open()
 
 	}
 
-   if ( strcmp(dpath, "./") == 0 )
+   if ( strcmp(dpath, "./") != 0 )
    {
 	if(datedir)
 	{
