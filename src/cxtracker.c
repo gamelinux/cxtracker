@@ -210,9 +210,10 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
    if ( intr_flag != 0 ) { check_interupt(); }
    inpacket = 1;
 
+   /* on OpenBSD the ts struct of the bpf header has a different definition
+    * than a timeval so assigning to timeval members individually */
    tstamp.tv_sec = (long) pheader->ts.tv_sec;
    tstamp.tv_usec = (long) pheader->ts.tv_usec;
-   /* tstamp = pheader->ts; */
 
    /* are we dumping */
    if (mode & MODE_DUMP) {
