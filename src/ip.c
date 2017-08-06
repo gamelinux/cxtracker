@@ -25,13 +25,12 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-#ifndef __FreeBSD__ 
-  #ifdef __APPLE__
+#ifdef __APPLE__
     #include <mach/error.h>
-  #else
+#endif /* __APPLE__ */
+#ifdef linux
     #include <error.h> 
-  #endif /* __APPLE__ */
-#endif /* __FreeBSD__ */
+#endif /* linux */
 
 // private functions
 

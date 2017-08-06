@@ -24,11 +24,8 @@
 #define __CXTRACKER_H__
 
 /*  I N C L U D E S  **********************************************************/
-#include "ip.h"
-
-#ifdef __FreeBSD__
 #include <sys/types.h>
-#endif /* __FreeBSD__ */
+#include "ip.h"
 
 /*  D E F I N E S  ************************************************************/
 #define VERSION                       "0.9.8.5"

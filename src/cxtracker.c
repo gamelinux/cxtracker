@@ -210,7 +210,10 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
    if ( intr_flag != 0 ) { check_interupt(); }
    inpacket = 1;
 
-   tstamp = pheader->ts;
+   /* on OpenBSD the ts struct of the bpf header has a different definition
+    * than a timeval so assigning to timeval members individually */
+   tstamp.tv_sec = (long) pheader->ts.tv_sec;
+   tstamp.tv_usec = (long) pheader->ts.tv_usec;
 
    /* are we dumping */
    if (mode & MODE_DUMP) {
@@ -376,7 +379,6 @@ void got_packet (u_char *useless,const struct pcap_pkthdr *pheader, const u_char
    /* } */
 }
 
-inline
 int cx_track(ip_t *ip_src, uint16_t src_port,ip_t *ip_dst, uint16_t dst_port,
                uint8_t ip_proto, uint32_t p_bytes, uint8_t tcpflags,struct timeval tstamp, int af) {
 
@@ -624,10 +626,10 @@ void cxtbuffer_write () {
 
    if (mode == MODE_FILE) {
        bname = strdup(basename(read_file));
-       sprintf(cxtfname, "%sstats.%s.%ld", dpath, bname, tstamp.tv_sec);
+       snprintf(cxtfname, sizeof(cxtfname), "%sstats.%s.%ld", dpath, bname, (long) tstamp.tv_sec);
        free(bname);
    } else {
-       sprintf(cxtfname, "%sstats.%s.%ld", dpath, dev, tstamp.tv_sec);
+       snprintf(cxtfname, sizeof(cxtfname), "%sstats.%s.%ld", dpath, dev, (long) tstamp.tv_sec);
    }
    cxtFile = fopen(cxtfname, "w");
 
@@ -772,7 +774,7 @@ int dump_file_open()
 
 	}
 
-   if ( dpath != NULL )
+   if ( strcmp(dpath, "./") != 0 )
    {
 	if(datedir)
 	{
@@ -1036,7 +1038,7 @@ int daemonize() {
 }
 
 static int go_daemon() {
-    return daemonize(NULL);
+    return daemonize();
 }
 
 static void banner() {

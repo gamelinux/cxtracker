@@ -26,9 +26,12 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-#ifdef __FreeBSD__
+#if (defined(__unix__) || defined(unix)) && !defined(USG)
+#include <sys/param.h>
+#endif
+#ifdef BSD
 #include <sys/socket.h>
-#endif /* __FreeBSD__ */
+#endif /* BSD */
 
 #define IP_ADDRMAX       NI_MAXHOST
 
